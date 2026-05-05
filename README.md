@@ -153,8 +153,6 @@ nextflow run main.nf -profile test
 |---------|-------------|
 | `conda` | Local conda environment — recommended default |
 | `mamba` | Same as conda but uses mamba for faster solves |
-| `docker` | Docker container (build image first — see below) |
-| `singularity` | Singularity container — best for HPC clusters |
 | `test` | Runs bundled test dataset; completes in minutes |
 
 ## Reproducibility
@@ -166,20 +164,6 @@ FinPhaser uses **process-level environment isolation** via Nextflow:
 - All environments are fully version-pinned in `envs/`
 
 This design avoids dependency conflicts and ensures consistent results across systems.
-
-### Docker
-
-```bash
-docker build -t finphaser:latest .
-nextflow run main.nf -profile docker
-```
-
-### HPC / Singularity
-
-```bash
-singularity build finphaser.sif docker://finphaser:latest
-nextflow run main.nf -profile singularity
-```
 
 ---
 

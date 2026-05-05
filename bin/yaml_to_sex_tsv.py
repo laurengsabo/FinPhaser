@@ -14,7 +14,7 @@ Output format (matches the original Genomics_Sex.tsv exactly) (example of exampl
     YH016<TAB>F
     ...
 
-Naming sanitisation applied here (usign example data):
+Naming sanitisation applied here (using example data):
   - VCF sample names use underscores: YH_006_f, YH_011_m, YH_016
   - SPORE cannot handle underscores in sample IDs
   - This script strips all underscores when writing the TSV:
