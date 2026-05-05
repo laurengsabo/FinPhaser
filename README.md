@@ -199,7 +199,7 @@ YHPedigree1_FilteredSNVs.recode.vcf
  AHMM branch      IBD branch
      │                │
      ▼                ▼
-┌─────────────────┐  ┌──────────────────────────┐
+┌─────────────────┐  ┌───────────────────-───────┐
 │  Steps 2+3      │  │  Step 6a — COMPRESS_VCF   │
 │  PREPARE_HMM    │  │  bgzip + CSI index        │
 │  INPUT          │  │                           │
@@ -209,7 +209,7 @@ YHPedigree1_FilteredSNVs.recode.vcf
 │  → mod_         │  └──────────┬────────────────┘
 │    popinfo.txt  │             │
 │                 │             ▼
-│  mod_vcf2ahmm   │  ┌──────────────────────────┐
+│  mod_vcf2ahmm   │  ┌───────────────────-───────┐
 │  .py (-s flag)  │  │  Step 6c — RUN_SPORE      │
 │  → ancestry_    │  │  SPORE.R + TRUFFLE        │
 │    input.txt    │  │  → *-truffle.ibd          │
