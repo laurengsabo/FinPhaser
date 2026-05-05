@@ -1,0 +1,27 @@
+name: finphaser
+
+# ============================================================
+#  FinPhaser Conda Environment
+# ============================================================
+#  All versions are pinned for reproducibility.
+#  Build:    conda env create -f finphaser.yml
+#  Activate: conda activate finphaser
+#  Update:   conda env update -f finphaser.yml --prune
+# ============================================================
+
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.10
+  - nextflow=24.04.4
+  - ancestry_hmm=1.0.2
+  - bcftools=1.21
+  - htslib=1.21
+  - selam=0.9
+  - gsl=2.7
+  - scikit-allel=1.3.7
+  - pandas=2.2.2
+  - numpy=1.26.4
+  - gzip
+  - git

@@ -1,0 +1,28 @@
+name: spore
+
+# ============================================================
+#  SPORE Conda Environment
+# ============================================================
+#  All versions are pinned for reproducibility.
+#  Build:    conda env create -f spore.yml
+#  Activate: conda activate spore
+#  Update:   conda env update -f spore.yml --prune
+# ============================================================
+
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - r-base=3.6.3
+  - r-readr=1.4.0
+  - r-stringr=1.4.0
+  - r-dplyr=1.0.2
+  - r-tidyr=1.1.2
+  - r-data.table=1.13.2
+  - r-ggplot2=3.3.2
+  - r-naturalsort=0.1.3
+  - r-sys=3.4
+  - r-r.utils
+  - bcftools=1.10
+  - gzip
+  - git
