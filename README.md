@@ -19,12 +19,12 @@
 
 The framework integrates:
 
-- Variant filtering and phasing (PhaseParents_VCF.py)
-- Hidden Markov Models for local ancestry inference (ancestry_hmm)
-- Admixture analysis using SPORE
-- IBD detection and ranked relatedness scoring
+- Variant filtering and phasing (`PhaseParents_VCF.py`)
+- Hidden Markov Models for local ancestry inference (`ancestry_hmm`)
+- IBD detection using SPORE + TRUFFLE
+- Ranked relatedness scoring
 
-It is particularly suited for studying **complex sex determination systems**, including ZW/XY dynamics on the LG10 linkage group in *Aulonocara* 'Yellow Head'.
+It is particularly suited for studying **complex sex determination systems**, including ZW/XY dynamics on the LG10 linkage group in *Aulonocara* 'Yellow Head'. By backcrossing a male YH with *Mchenga conophoros*, parental haplotypes on LG10 can be isolated and tracked in F1 offspring. SPORE is used to assess IBD among offspring, quantifying inbreeding accumulated across many generations of lab-bred stock.
 
 The entire pipeline runs in **a single command** via [Nextflow](https://www.nextflow.io/), requiring only two input files: a filtered VCF and a samples YAML.
 
@@ -42,13 +42,15 @@ The entire pipeline runs in **a single command** via [Nextflow](https://www.next
 
 **Install Nextflow** (if not already installed):
 ```bash
-# Option A — direct install (puts nextflow in your PATH)
+# Option A — direct install
 curl -s https://get.nextflow.io | bash
 sudo mv nextflow /usr/local/bin/
 
 # Option B — via conda (already included in environment.yml)
 conda install -c conda-forge nextflow
 ```
+
+---
 
 ### 1. Clone the repository
 
@@ -57,49 +59,109 @@ git clone https://github.com/your-username/FinPhaser.git
 cd FinPhaser
 ```
 
-### 2. Create the conda environment
+---
+
+### 2. Place your input files
+
+```bash
+# Your starting VCF — the only genomic input needed
+mkdir -p data/raw
+cp /path/to/YHPedigree1_FilteredSNVs.recode.vcf data/raw/
+
+# TRUFFLE binary (standalone executable — not available via conda)
+mkdir -p tools/truffle
+cp /path/to/truffle/truffle      tools/truffle/truffle
+cp /path/to/truffle/LICENSE.txt  tools/truffle/LICENSE.txt
+chmod +x tools/truffle/truffle
+```
+
+---
+
+### 3. Place your analysis scripts
+
+```bash
+# SPORE R scripts (copy from your SPORE installation)
+mkdir -p src/spore/scripts
+cp /path/to/SPORE/SPORE.R            src/spore/SPORE.R
+cp /path/to/SPORE/scripts/Mendel1.R  src/spore/scripts/Mendel1.R
+
+# Python analysis scripts
+mkdir -p src/ancestry src/reporting
+cp /path/to/PhaseParents_VCF.py  src/ancestry/
+cp /path/to/mod_vcf2ahmm.py      src/ancestry/
+cp /path/to/SNV_count.py         src/ancestry/
+cp /path/to/rank_ibd.py          src/reporting/
+```
+
+> `Mendel1.R` must be at `src/spore/scripts/Mendel1.R` — `SPORE.R` sources it relative to its own location.
+
+---
+
+### 4. Build the conda environment
 
 ```bash
 conda env create -f environment.yml
 conda activate FinPhaser
 ```
 
-> **Faster alternative:** replace `conda` with `mamba` in the command above, or use the `mamba` profile (see [Execution Profiles](#execution-profiles)).
+> **Faster alternative:** use `mamba env create` or run with `-profile mamba`.
 
-### 3. Configure your samples
+---
 
-Edit `config/samples.yml` to match your data.  Two things to set:
+### 5. Configure your samples
 
-**a) Population assignments** — assign every VCF sample to a reference population (0–3) or mark it as admixed (-1):
+All pipeline configuration lives in `config/samples.yml`. The two things to set for your data:
+
+**a) Population assignments** — each diploid parent appears **twice** (once per haplotype it contributes). Offspring are marked `admixed`.
 
 ```yaml
 populations:
-  - sample: "YH_P1"
-    population: 0     # Paternal Haplotype 1 (reference)
-  - sample: "YH_016"
-    population: -1    # Admixed offspring — ancestry inferred by HMM
+  # Female parent — contributes maternal haplotypes 0 and 1
+  - sample: "YH_006_f"
+    population: 0
+    sex: F
+  - sample: "YH_006_f"
+    population: 1
+    sex: F
+
+  # Male parent — contributes paternal haplotypes 2 and 3
+  - sample: "YH_011_m"
+    population: 2
+    sex: M
+  - sample: "YH_011_m"
+    population: 3
+    sex: M
+
+  # Admixed offspring — ancestry inferred by HMM
+  - { sample: "YH_016", population: admixed, sex: F }
+  - { sample: "YH_017", population: admixed, sex: M }
 ```
 
-**b) SPORE sex metadata path:**
+**b) TRUFFLE path** — point to the binary placed in `tools/truffle/`:
 
 ```yaml
 spore:
-  sex_metadata: "data/raw/Genomics_Sex.tsv"
-  output_prefix: "brood1_final"
+  truffle_path: "tools/truffle/truffle"
 ```
 
-### 4. Run the pipeline
+Sex metadata (`Genomics_Sex.tsv`) is **generated automatically** at runtime from the `sex` field in `samples.yml` — you do not need to maintain a separate file.
+
+---
+
+### 6. Run the pipeline
 
 ```bash
-nextflow run main.nf -profile conda \
-    --vcf         data/raw/YHPedigree1_FilteredSNVs.recode.vcf \
-    --samples_yml config/samples.yml
+nextflow run main.nf -profile conda
 ```
 
-That's it. Nextflow manages every step — no manual script invocations needed.
+That's it. Nextflow manages every step automatically.
 
-#### Quick test (bundled data)
+**Resume after a failure** (completed steps are not re-run):
+```bash
+nextflow run main.nf -profile conda -resume
+```
 
+**Quick test on bundled data:**
 ```bash
 nextflow run main.nf -profile test
 ```
@@ -108,128 +170,159 @@ nextflow run main.nf -profile test
 
 ## Execution Profiles
 
-Select a profile with `-profile <name>`:
-
 | Profile | Description |
 |---------|-------------|
 | `conda` | Local conda environment — recommended default |
 | `mamba` | Same as conda but uses mamba for faster solves |
-| `docker` | Docker container (see [Docker](#docker)) |
+| `docker` | Docker container (build image first — see below) |
 | `singularity` | Singularity container — best for HPC clusters |
 | `test` | Runs bundled test dataset; completes in minutes |
 
 ### Docker
 
-If you prefer a fully self-contained container:
-
 ```bash
-# Build the image once
 docker build -t finphaser:latest .
-
-# Run the pipeline
-nextflow run main.nf -profile docker \
-    --vcf         data/raw/YHPedigree1_FilteredSNVs.recode.vcf \
-    --samples_yml config/samples.yml
+nextflow run main.nf -profile docker
 ```
 
 ### HPC / Singularity
 
 ```bash
-# Convert the Docker image to a Singularity image
 singularity build finphaser.sif docker://finphaser:latest
-
-# Run
-nextflow run main.nf -profile singularity \
-    --vcf         data/raw/YHPedigree1_FilteredSNVs.recode.vcf \
-    --samples_yml config/samples.yml
+nextflow run main.nf -profile singularity
 ```
 
 ---
 
 ## Pipeline Workflow
 
-The pipeline runs all steps in sequence, with automatic dependency resolution:
+One starting VCF feeds both the ancestry and IBD branches after phasing:
 
 ```
 YHPedigree1_FilteredSNVs.recode.vcf
-samples.yml
+config/samples.yml
         │
         ▼
-┌─────────────────────────────────┐
-│  Step 1 — PHASE_PARENTS         │  PhaseParents_VCF.py
-│  Identify conserved SNVs        │  → YHPed1_conserved_phased.vcf
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  Steps 2+3 — PREPARE_HMM_INPUT  │  mod_vcf2ahmm.py --pop-yaml
-│  Pop assignments from YAML      │  → ancestry_input.txt
-│  VCF → ancestry_hmm format      │  → ahmm.ploidy
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  Step 4 — RUN_ANCESTRY_HMM      │  ancestry_hmm
-│  Local ancestry posteriors      │  → *.posterior (per sample)
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  Step 5 — ANCESTRY_SUMMARY      │  SNV_count.py
-│  Readable summary CSVs          │  → ancestry_summary_report/
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  Step 6 — RUN_SPORE             │  SPORE.R
-│  IBD segment detection          │  → *.ibd
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│  Step 7 — RANK_IBD              │  rank_ibd.py
-│  Ranked relatedness scores      │  → inbreeding_rankings.txt/.tsv
-└─────────────────────────────────┘
+┌──────────────────────────────────────┐
+│  Step 1 — PHASE_PARENTS              │  PhaseParents_VCF.py
+│  Identify conserved informative SNVs │  → YHPed1_conserved_phased.vcf
+└────────────┬─────────────────────────┘
+             │
+     ┌───────┴────────┐
+     │                │
+     ▼                ▼
+ AHMM branch      IBD branch
+     │                │
+     ▼                ▼
+┌─────────────────┐  ┌──────────────────────────┐
+│  Steps 2+3      │  │  Step 6a — COMPRESS_VCF   │
+│  PREPARE_HMM    │  │  bgzip + CSI index        │
+│  INPUT          │  │                           │
+│                 │  │  Step 6b — WRITE_SEX_TSV  │
+│  yaml_to_       │  │  yaml_to_sex_tsv.py       │
+│  popinfo.py     │  │  → Genomics_Sex.tsv       │
+│  → mod_         │  └──────────┬────────────────┘
+│    popinfo.txt  │             │
+│                 │             ▼
+│  mod_vcf2ahmm   │  ┌──────────────────────────┐
+│  .py (-s flag)  │  │  Step 6c — RUN_SPORE      │
+│  → ancestry_    │  │  SPORE.R + TRUFFLE        │
+│    input.txt    │  │  → *-truffle.ibd          │
+│  → ahmm.ploidy  │  └──────────┬────────────────┘
+└──────┬──────────┘             │
+       │                        ▼
+       ▼             ┌──────────────────────────┐
+┌──────────────────┐ │  Step 7 — RANK_IBD       │
+│  Step 4          │ │  rank_ibd.py             │
+│  RUN_ANCESTRY_   │ │  → inbreeding_rankings   │
+│  HMM             │ │    .txt / .tsv           │
+│  → *.posterior   │ └──────────────────────────┘
+└──────┬───────────┘
+       ▼
+┌──────────────────┐
+│  Step 5          │
+│  ANCESTRY_       │
+│  SUMMARY         │
+│  SNV_count.py    │
+│  → summary CSVs  │
+└──────────────────┘
 ```
 
-Steps 2 and 3 are combined into a single process: `mod_vcf2ahmm.py` now accepts `--pop-yaml` and builds the internal population info file automatically from `samples.yml`.
+**Key design decisions:**
+- Steps 2 and 3 are combined: `bin/yaml_to_popinfo.py` converts `samples.yml` into the tab-separated population info file that `mod_vcf2ahmm.py` reads via its `-s` flag. `mod_vcf2ahmm.py` is **not modified**.
+- Sex metadata is generated at runtime by `bin/yaml_to_sex_tsv.py` — no separate `Genomics_Sex.tsv` file needed as input.
+- Underscores are stripped from sample names automatically before SPORE runs.
+- SPORE-Settings.R is fully auto-generated from `samples.yml` — no manual editing required.
 
 ---
 
 ## Inputs
 
+Only two files are required to start the pipeline:
+
 | File | Description |
 |------|-------------|
-| `data/raw/YHPedigree1_FilteredSNVs.recode.vcf` | Raw filtered SNV VCF — the only genomic input required |
-| `config/samples.yml` | Population assignments + SPORE settings |
-| `data/raw/Genomics_Sex.tsv` | Sex metadata referenced inside `samples.yml` |
+| `data/raw/YHPedigree1_FilteredSNVs.recode.vcf` | Raw filtered SNV VCF — the only genomic input |
+| `config/samples.yml` | All configuration: population assignments, sex, HMM params, SPORE settings |
 
 ### samples.yml structure
 
 ```yaml
-spore:
-  sex_metadata: "data/raw/Genomics_Sex.tsv"
-  output_prefix: "brood1_final"
+# HMM parameters — forwarded to mod_vcf2ahmm.py
+hmm:
+  recombination_rate: 1.0e-8
+  min_distance_bp: 1000
+  min_allele_freq_diff: 0.1
+  use_genotypes: 0
 
+# SPORE / TRUFFLE settings
+spore:
+  truffle_path: "tools/truffle/truffle"
+  truffle_maf: 0.05
+  truffle_missing: 0.95
+  APO: 24
+  output_label: "YHPed1_brood1"
+  max_memory: "4G"
+  max_cores: 4
+  plots: TRUE
+  # ... (see config/samples.yml for full parameter list)
+
+# Sample assignments
+# population → used by AHMM only
+# sex        → used by SPORE only
 populations:
-  - sample: "YH_P1"
-    population: 0       # 0–3 = reference population index
-  - sample: "YH_016"
-    population: -1      # -1 = admixed; ancestry inferred by HMM
+  - sample: "YH_006_f"
+    population: 0          # maternal haplotype 1
+    sex: F
+  - sample: "YH_006_f"
+    population: 1          # maternal haplotype 2
+    sex: F
+  - sample: "YH_011_m"
+    population: 2          # paternal haplotype 1
+    sex: M
+  - sample: "YH_011_m"
+    population: 3          # paternal haplotype 2
+    sex: M
+  - { sample: "YH_016", population: admixed, sex: F }
 ```
 
-Population codes follow `ancestry_hmm` convention:
-- `0` = Paternal Haplotype 1
-- `1` = Paternal Haplotype 2
-- `2` = Maternal Haplotype 1
-- `3` = Maternal Haplotype 2
-- `-1` = Admixed offspring
+**Population codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Maternal haplotype 1 |
+| `1` | Maternal haplotype 2 |
+| `2` | Paternal haplotype 1 |
+| `3` | Paternal haplotype 2 |
+| `admixed` | Offspring — ancestry inferred by HMM |
+
+> Parents appear **twice** in the list — once per haplotype — because each diploid parent contributes two distinct haplotypes to the 4-population HMM model.
 
 ---
 
 ## Outputs
 
-All outputs land in `results/` (or the directory specified by `--outdir`):
+All outputs land in `results/`:
 
 ```
 results/
@@ -238,17 +331,23 @@ results/
 │   │   └── YHPed1_conserved_phased.vcf
 │   ├── 02_hmm_input/
 │   │   ├── ancestry_input.txt
-│   │   └── ahmm.ploidy
+│   │   ├── ahmm.ploidy
+│   │   └── mod_popinfo.txt          # generated from samples.yml; saved for inspection
 │   ├── 03_posteriors/
 │   │   └── YH_016.posterior ... YH_042.posterior
 │   └── ancestry_summary_report/
-│       ├── calls_YH_016.csv
+│       ├── calls_YH_016.posterior.csv
 │       ├── ...
 │       └── master_ancestry_summary.csv
 ├── ibd/
-│   ├── 06_spore/
-│   │   ├── brood1_final.vcf.gz-truffle.ibd
-│   │   └── SPORE_output.log
+│   ├── 06_spore_input/
+│   │   ├── YHPed1_conserved_phased.vcf.gz     # bgzipped phased VCF
+│   │   ├── YHPed1_conserved_phased.vcf.gz.csi # CSI index
+│   │   └── Genomics_Sex.tsv                   # auto-generated from samples.yml
+│   ├── 06_spore_output/
+│   │   ├── YHPed1_conserved_phased.vcf.gz-truffle.ibd
+│   │   ├── SPORE_output.log
+│   │   └── SPORE-Settings.R         # saved for full reproducibility
 │   └── 07_rankings/
 │       ├── inbreeding_rankings.txt
 │       └── inbreeding_rankings.tsv
@@ -263,9 +362,10 @@ results/
 |------|-------------|
 | `*.posterior` | Local ancestry probabilities per genomic site, per sample |
 | `master_ancestry_summary.csv` | Aggregated ancestry calls across all samples |
-| `*.ibd` | IBD segment calls from SPORE/TRUFFLE |
+| `*-truffle.ibd` | IBD segment calls from SPORE/TRUFFLE |
 | `inbreeding_rankings.tsv` | Ranked relatedness scores (TSV for downstream plotting) |
-| `execution_report.html` | Nextflow HTML report with runtime and resource usage |
+| `SPORE-Settings.R` | Auto-generated settings file — saved for reproducibility |
+| `execution_report.html` | Nextflow HTML report — runtime, resource usage, per-step logs |
 
 ---
 
@@ -273,59 +373,74 @@ results/
 
 ```
 .
-├── main.nf                  # Pipeline entry point
-├── nextflow.config          # Profiles, resource limits, reporting
-├── environment.yml          # Pinned conda environment
+├── bin/                            # Helper scripts called by Nextflow processes
+│   ├── generate_spore_settings.py  # Writes complete SPORE-Settings.R from samples.yml
+│   ├── txt_to_tsv.py               # Converts rank_ibd .txt output to .tsv
+│   ├── yaml_to_popinfo.py          # Converts samples.yml → mod_popinfo.txt for mod_vcf2ahmm.py
+│   └── yaml_to_sex_tsv.py          # Converts samples.yml → Genomics_Sex.tsv for SPORE
 ├── config/
-│   ├── samples.yml          # User-facing config: pop assignments + SPORE settings
-├── bin/                     # Pipeline helper scripts (called by Nextflow)
-│   ├── generate_spore_settings.py
-│   └── txt_to_tsv.py
-├── workflows/               # Nextflow subworkflow definitions
-│   ├── ancestry.nf          # Steps 1–5
-│   └── ibd.nf               # Steps 6–7
+│   └── samples.yml                 # All user config: populations, sex, HMM + SPORE params
+├── data/
+│   ├── raw/
+│   │   └── YHPedigree1_FilteredSNVs.recode.vcf   # Starting VCF (only genomic input)
+│   └── test/                       # Bundled test dataset
+├── docs/                           # Architecture diagrams and notes
+├── environment.yml                 # Pinned conda environment
+├── main.nf                         # Pipeline entry point
+├── nextflow.config                 # Profiles, resource limits, reporting
 ├── src/
 │   ├── ancestry/
-│   │   ├── PhaseParents_VCF.py
-│   │   ├── mod_vcf2ahmm.py  # Modified — now accepts --pop-yaml
-│   │   └── SNV_count.py
+│   │   ├── PhaseParents_VCF.py     # Step 1 — phase parental genotypes
+│   │   ├── mod_vcf2ahmm.py         # Step 3 — convert phased VCF to ancestry_hmm format
+│   │   └── SNV_count.py            # Step 5 — summarise posterior probability files
 │   ├── reporting/
-│   │   └── rank_ibd.py
-│   └── SPORE.R
-├── data/
-│   ├── raw/                 # Input files (VCF, sex metadata TSV)
-│   └── test/                # Bundled test dataset
-├── docs/                    # Architecture diagrams and notes
-└── results/                 # Pipeline outputs (git-ignored)
+│   │   └── rank_ibd.py             # Step 7 — rank IBD segments by relatedness
+│   └── spore/
+│       ├── SPORE.R                 # Step 6 — IBD detection (SPORE + TRUFFLE)
+│       ├── scripts/
+│       │   └── Mendel1.R           # Sourced internally by SPORE.R
+│       ├── LICENSE
+│       └── README.MD
+├── tools/
+│   └── truffle/
+│       ├── truffle                 # TRUFFLE binary (not available via conda)
+│       └── LICENSE.txt
+├── workflows/
+│   ├── ancestry.nf                 # Nextflow subworkflow: steps 1–5
+│   └── ibd.nf                      # Nextflow subworkflow: steps 6–7
+└── results/                        # Pipeline outputs (git-ignored)
 ```
 
 ---
 
 ## Troubleshooting
 
+**`import allel` error**
+`PhaseParents_VCF.py` requires `scikit-allel`. Ensure the conda environment was built from the current `environment.yml` (`scikit-allel=1.3.7` is pinned there) and is active.
+
+**TRUFFLE binary not found**
+Ensure `tools/truffle/truffle` exists and is executable:
+```bash
+chmod +x tools/truffle/truffle
+```
+The path in `config/samples.yml` under `spore.truffle_path` must match exactly.
+
 **Sample name formatting (SPORE)**
-SPORE does not allow underscores in sample IDs. FinPhaser handles this automatically — the pipeline sanitises names before SPORE runs. You do not need to rename samples in your VCF or YAML.
+SPORE cannot handle underscores in sample IDs. FinPhaser strips them automatically when generating `Genomics_Sex.tsv` — no manual renaming needed in your VCF or `samples.yml`.
+
+**`data/raw/Genomics_Sex.tsv` not needed**
+If you have this file from a previous manual run, you can safely remove it. Sex metadata is now read from `samples.yml` and the TSV is generated automatically at runtime.
 
 **Unexpected LG10 results**
-Verify the HMM pulse parameters in `nextflow.config` match your expected admixture history. The default (`-p 0..3 -2 0.25`) assumes ~2 generations of admixture. Adjust if your crossing design differs.
-
-**Dependency or environment issues**
-Ensure the conda environment is active (`conda activate FinPhaser`) if you are running scripts directly outside Nextflow. Within a Nextflow run the environment is activated automatically by the selected profile.
+Verify the HMM pulse parameters in `config/samples.yml` match your crossing design. The default (`-p 0..3 -2 0.25`) assumes ~2 generations of admixture.
 
 **Resuming a failed run**
-Nextflow caches completed steps. If a run fails midway, fix the issue and resume without re-running successful steps:
 ```bash
 nextflow run main.nf -profile conda -resume
 ```
 
-**Nextflow not found**
-If `nextflow` is not in your PATH after activating the conda environment, install it directly:
-```bash
-curl -s https://get.nextflow.io | bash && sudo mv nextflow /usr/local/bin/
-```
-
-**Viewing logs**
-Each step writes its stdout/stderr to `.nextflow/` and to `results/pipeline_info/`. Check `execution_report.html` for a summary of which processes ran, their duration, and exit codes.
+**Viewing step-level logs**
+Check `results/pipeline_info/execution_report.html` for per-process status, duration, and exit codes. Raw logs are in `.nextflow/`.
 
 ---
 
