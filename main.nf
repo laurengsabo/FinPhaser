@@ -39,7 +39,7 @@ workflow {
     // ── Startup log ──────────────────────────────────────────────────────────
     log.info """
     ┌─────────────────────────────────────────────────────────┐
-    │           F I N P H A S E R  v1.0.0                    │
+    │           F I N P H A S E R  v1.0.0                     │
     │  Local Ancestry Inference & IBD Detection Pipeline      │
     └─────────────────────────────────────────────────────────┘
     vcf          : ${vcf_path}  (from samples.yml)
@@ -78,22 +78,23 @@ workflow {
         ANCESTRY_WORKFLOW.out.phased_vcf,
         ch_samples_yml
     )
-}
 
-// ── Completion handler ────────────────────────────────────────────────────────
-workflow.onComplete {
-    def status = workflow.success ? "SUCCESS ✔" : "FAILED ✘"
-    log.info """
-    ──────────────────────────────────────────────────────────
-    Pipeline complete!
-    Status   : ${status}
-    Duration : ${workflow.duration}
-    Outputs  : ${params.outdir}/
-    Report   : ${params.tracedir}/execution_report.html
-    ──────────────────────────────────────────────────────────
-    """.stripIndent()
-}
+    // ── Completion handler ────────────────────────────────────────────────────
+    // Moved inside workflow {} block — required by Nextflow 26+
+    workflow.onComplete {
+        def status = workflow.success ? "SUCCESS ✔" : "FAILED ✘"
+        log.info """
+        ──────────────────────────────────────────────────────────
+        Pipeline complete!
+        Status   : ${status}
+        Duration : ${workflow.duration}
+        Outputs  : ${params.outdir}/
+        Report   : ${params.tracedir}/execution_report.html
+        ──────────────────────────────────────────────────────────
+        """.stripIndent()
+    }
 
-workflow.onError {
-    log.error "Pipeline failed: ${workflow.errorReport}"
+    workflow.onError {
+        log.error "Pipeline failed: ${workflow.errorReport}"
+    }
 }
