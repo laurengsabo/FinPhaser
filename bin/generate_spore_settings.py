@@ -2,21 +2,32 @@
 """
 bin/generate_spore_settings.py
 ================================
-Generates SPORE-Settings.R from paths passed directly as CLI arguments.
-Sex metadata is written by yaml_to_sex_tsv.py before this script runs,
-so this script simply receives the path to that file and the VCF.
+Generates a complete SPORE-Settings.R from samples.yml and runtime paths.
 
-No yaml/pyyaml import — all inputs come via CLI flags, making this
-script runnable without activating the conda environment.
+Previously this script only wrote 3 variables. It now writes every
+variable that SPORE.R reads, matching the full settings file format
+used in the working manual runs.
 
-Called automatically by the Nextflow RUN_SPORE process.
+Key decisions made here:
+  - `folder` is set to the Nextflow process working directory (passed
+    as --workdir). SPORE expects folder to end with "/".
+  - `vcf` is just the filename (not a path) because SPORE constructs
+    the full path as paste0(folder, vcf).
+  - `Genomics_Sex_File` is the absolute path to the TSV written by
+    yaml_to_sex_tsv.py (underscores already stripped there).
+  - `trufflepath` comes from spore.truffle_path in samples.yml.
+  - All other parameters come from the spore: block of samples.yml.
 
-Usage:
+No pyyaml dependency — uses the same stdlib-only parser shared by the
+other bin/ scripts.
+
+Usage (called automatically by Nextflow — not normally run directly):
     python bin/generate_spore_settings.py \\
-        --vcf         YHPed1_conserved_phased.vcf.gz \\
-        --sex-tsv     Genomics_Sex.tsv               \\
-        --prefix      brood1_final                    \\
-        --out         SPORE-Settings.R
+        --vcf-filename  YHPed1_conserved_phased.vcf.gz \\
+        --workdir       /path/to/nextflow/workdir/ \\
+        --sex-tsv       /abs/path/Genomics_Sex.tsv \\
+        --samples-yml   config/samples.yml \\
+        --out           SPORE-Settings.R
 """
 
 import argparse
@@ -24,47 +35,166 @@ import sys
 from pathlib import Path
 
 
+# ── Minimal stdlib YAML parser ────────────────────────────────────────────────
+def parse_spore_block(yml_path: Path) -> dict:
+    """
+    Parse only the spore: block from samples.yml.
+    Returns a flat dict of key → value (all as strings).
+    Handles simple scalar values only — no nested structures needed.
+    """
+    text = yml_path.read_text()
+    spore = {}
+    in_spore = False
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+
+        if line == "spore:":
+            in_spore = True
+            continue
+
+        # Stop at the next top-level key
+        if in_spore and line and not line.startswith("#"):
+            indent = len(raw_line) - len(raw_line.lstrip())
+            if indent == 0 and ":" in line:
+                in_spore = False
+                continue
+
+        if not in_spore or not line or line.startswith("#"):
+            continue
+
+        if ":" in line:
+            k, v = line.split(":", 1)
+            spore[k.strip()] = v.strip().strip('"').strip("'")
+
+    return spore
+
+
+def r_bool(val: str) -> str:
+    """Convert Python/YAML boolean strings to R TRUE/FALSE."""
+    if str(val).upper() in ("TRUE", "YES", "1"):
+        return "TRUE"
+    return "FALSE"
+
+
+def r_str(val: str) -> str:
+    """Wrap a value in R double quotes."""
+    return f'"{val}"'
+
+
 def parse_args():
-    p = argparse.ArgumentParser(description="Generate SPORE-Settings.R")
-    p.add_argument("--vcf",     required=True, help="bgzipped + tabix-indexed phased VCF (.vcf.gz)")
-    p.add_argument("--sex-tsv", required=True, help="Genomics_Sex.tsv written by yaml_to_sex_tsv.py")
-    p.add_argument("--prefix",  default="brood1_final", help="SPORE output file prefix")
-    p.add_argument("--out",     default="SPORE-Settings.R", help="Output settings file path")
+    p = argparse.ArgumentParser(description="Generate complete SPORE-Settings.R")
+    p.add_argument("--vcf-filename", required=True,
+                   help="The compressed VCF filename (e.g. YHPed1_conserved_phased.vcf.gz), not a path")
+    p.add_argument("--workdir",      required=True,
+                   help="Absolute path to Nextflow process working directory (becomes `folder`)")
+    p.add_argument("--sex-tsv",      required=True,
+                   help="Absolute path to Genomics_Sex.tsv")
+    p.add_argument("--samples-yml",  required=True,
+                   help="Path to samples.yml")
+    p.add_argument("--out",          default="SPORE-Settings.R",
+                   help="Output settings file name")
     return p.parse_args()
 
 
 def main():
     args = parse_args()
 
-    vcf_path = Path(args.vcf).resolve()
-    tsv_path = Path(args.sex_tsv).resolve()
+    yml_path = Path(args.samples_yml)
+    if not yml_path.exists():
+        sys.exit(f"ERROR: samples.yml not found: {yml_path}")
 
-    if not vcf_path.exists():
-        sys.exit(f"ERROR: VCF not found: {vcf_path}")
-    if not tsv_path.exists():
-        sys.exit(f"ERROR: sex TSV not found: {tsv_path}")
+    spore = parse_spore_block(yml_path)
 
-    settings_r = f"""\
+    # Validate required keys
+    required = ["truffle_path", "truffle_maf", "truffle_missing", "APO",
+                "max_memory", "max_cores", "output_label"]
+    missing = [k for k in required if k not in spore]
+    if missing:
+        sys.exit(f"ERROR: Missing keys in spore: block of samples.yml: {missing}")
+
+    # Resolve truffle path — if relative, make it absolute from repo root
+    truffle_raw = spore["truffle_path"]
+    truffle_path = Path(truffle_raw)
+    if not truffle_path.is_absolute():
+        # Relative to the project root (two levels up from bin/)
+        repo_root = yml_path.parent.parent
+        truffle_path = (repo_root / truffle_raw).resolve()
+
+    if not truffle_path.exists():
+        print(
+            f"[generate_spore_settings] WARNING: truffle binary not found at "
+            f"{truffle_path}. Make sure to copy it to tools/truffle before running.",
+            file=sys.stderr,
+        )
+
+    # Ensure folder path ends with /
+    workdir = args.workdir.rstrip("/") + "/"
+
+    # Build the R settings file — variable names match SPORE.R exactly
+    settings = f"""\
 # SPORE-Settings.R
 # Auto-generated by FinPhaser pipeline (bin/generate_spore_settings.py)
 # Do not edit manually — regenerated on each pipeline run.
+# Source: config/samples.yml  [spore:] block
+
+# ── TRUFFLE executable ────────────────────────────────────────────────────────
+trufflepath={r_str(truffle_path)}
+
+# ── TRUFFLE filters ───────────────────────────────────────────────────────────
+truffle_maf={spore["truffle_maf"]}
+truffle_missing={spore["truffle_missing"]}
+
+# ── SPORE sensitivity ─────────────────────────────────────────────────────────
+# APO = assumed number of offspring per individual (affects sensitivity)
+APO={spore["APO"]}
+
+# ── Sampling mode ─────────────────────────────────────────────────────────────
+IntermediateSamplingMode={r_bool(spore.get("intermediate_sampling_mode", "FALSE"))}
+
+# ── Memory / parallelism ──────────────────────────────────────────────────────
+max_memory={r_str(spore["max_memory"])}
+max_cores={spore["max_cores"]}
+trufflecpu=max_cores
 
 # ── Input files ───────────────────────────────────────────────────────────────
-# bgzipped, tabix-indexed phased VCF (produced by PhaseParents_VCF.py
-# → bgzip → tabix within the Nextflow COMPRESS_VCF process)
-vcf_file <- "{vcf_path}"
+# folder must end with "/" — SPORE constructs full path as paste0(folder, vcf)
+folder={r_str(workdir)}
+vcf={r_str(args.vcf_filename)}
 
-# Sex metadata TSV (generated from samples.yml by yaml_to_sex_tsv.py)
-# Columns: indv, GenomicsSex
-# Note: sample names here have underscores stripped (SPORE requirement):
-#   YH_006_f → YH006f,  YH_011_m → YH011m,  YH_016 → YH016, …
-sex_metadata <- "{tsv_path}"
+# Sex metadata: columns "indv" and "GenomicsSex" (F, M, Q)
+# Underscores stripped from sample names (SPORE requirement):
+#   YH_006_f → YH006f,  YH_011_m → YH011m,  YH_016 → YH016
+Genomics_Sex_File={r_str(Path(args.sex_tsv).resolve())}
 
-# ── Output prefix ─────────────────────────────────────────────────────────────
-output_prefix <- "{args.prefix}"
+# Birthdate file — leave as "" if not available
+Birthdate_File={r_str(spore.get("birthdate_file", ""))}
+
+# ── Output settings ───────────────────────────────────────────────────────────
+pedigree_file_add_name={r_str(spore.get("pedigree_file_add_name", ""))}
+plots={r_bool(spore.get("plots", "TRUE"))}
+
+# ── Filtering thresholds ──────────────────────────────────────────────────────
+min_loci={spore.get("min_loci", "1")}
+IBD2_DP_Threshold={spore.get("IBD2_DP_threshold", "0.95")}
+downsample_for_homozygous_mendel={spore.get("downsample_for_homozygous_mendel", "1")}
+
+# ── Advanced: disable default SPORE variables ─────────────────────────────────
+no_IBD0={r_bool(spore.get("no_IBD0", "FALSE"))}
+no_IQR={r_bool(spore.get("no_IQR", "FALSE"))}
+no_HM={r_bool(spore.get("no_HM", "FALSE"))}
+
+# ── Optional extra variables file ─────────────────────────────────────────────
+ExtraVariables={r_str(spore.get("extra_variables", "none"))}
+
+# ── Advanced: resume previous partial run ────────────────────────────────────
+previously_computed={r_bool(spore.get("previously_computed", "FALSE"))}
+previously_computed_homozygous_mendel={r_bool(spore.get("previously_computed_homozygous_mendel", "FALSE"))}
+previously_computed_mendel={r_bool(spore.get("previously_computed_mendel", "FALSE"))}
+previously_computed_three_thresholds={r_bool(spore.get("previously_computed_three_thresholds", "FALSE"))}
 """
 
-    Path(args.out).write_text(settings_r)
+    Path(args.out).write_text(settings)
     print(f"[generate_spore_settings] Wrote {args.out}")
 
 

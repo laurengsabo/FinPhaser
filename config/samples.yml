@@ -1,9 +1,8 @@
 # ============================================================
 #  FinPhaser — Sample Configuration  (config/samples.yml)
 # ============================================================
-#  This file and your VCF are the only two inputs the pipeline
-#  needs. Sex metadata is now embedded here — you no longer
-#  need to maintain a separate Genomics_Sex.tsv file.
+#  This file and your starting VCF are the ONLY two inputs the
+#  pipeline needs. Everything else is derived from these.
 #
 #  Run the full pipeline with:
 #    nextflow run main.nf -profile conda \
@@ -12,7 +11,7 @@
 #
 # ── Biological context ───────────────────────────────────────
 #  Yellow Head cichlid (Aulonocara sp. 'Yellow Head') x
-#  Mchenga conophoros backcross experiment.
+#  Mchenga conophoros backcross.
 #
 #  A chromosomal inversion on LG10 is linked to sex
 #  determination. This cross isolates parental haplotypes so
@@ -21,19 +20,22 @@
 #  ancestry_hmm: infers which parental haplotype each offspring
 #    inherited at each genomic site (uses population field).
 #
-#  SPORE: assesses IBD/inbreeding among offspring, because the
-#    lab stock has been inbred across many generations and the
-#    degree of inbreeding is unknown (uses sex field).
+#  SPORE + TRUFFLE: assesses IBD/inbreeding among offspring,
+#    because the lab stock has been inbred across many
+#    generations and the degree of inbreeding is unknown
+#    (uses sex field).
 #
 # ── VCF data flow ────────────────────────────────────────────
-#  ONE starting VCF → phased by PhaseParents_VCF.py → used for:
-#    a) mod_vcf2ahmm.py  →  ancestry_hmm  (AHMM branch)
-#    b) bgzip + tabix    →  SPORE          (IBD branch)
+#  YHPedigree1_FilteredSNVs.recode.vcf   ← single starting VCF
+#    │
+#    ▼ PhaseParents_VCF.py
+#  YHPed1_conserved_phased.vcf
+#    ├──▶ mod_vcf2ahmm.py → ancestry_hmm   (AHMM branch)
+#    └──▶ bgzip + tabix  → SPORE/TRUFFLE   (IBD branch)
 #
 # ── Parent → haplotype mapping ───────────────────────────────
 #  Each diploid parent contributes TWO haplotypes, so it appears
-#  TWICE in the populations list (one entry per haplotype).
-#  Offspring appear ONCE with population: admixed.
+#  TWICE in the populations list.
 #
 #    YH_006_f  →  0  (maternal haplotype 1)
 #    YH_006_f  →  1  (maternal haplotype 2)
@@ -45,35 +47,87 @@
 #  sample     : must EXACTLY match the VCF column header
 #  population : 0/1/2/3 (reference haplotype) or admixed
 #               parents appear twice, once per haplotype
-#               this field is used by ancestry_hmm only
-#  sex        : M or F
-#               used by SPORE only; set to null if unknown
+#               used by ancestry_hmm only
+#  sex        : M, F, or Q (unknown)
+#               used by SPORE only
 #
 # ── Notes ────────────────────────────────────────────────────
-#  YH_034, YH_035, YH_036 are absent from both the original
-#  popinfo and sex metadata and are excluded here.
-#
-#  Sample names in VCF use underscores (YH_006_f, YH_016, …).
-#  SPORE cannot handle underscores — the pipeline strips them
-#  automatically when writing the sex metadata TSV for SPORE.
+#  YH_034, YH_035, YH_036 absent from source data — excluded.
+#  SPORE cannot handle underscores in sample names; the pipeline
+#  strips them automatically (YH_016 → YH016) when writing the
+#  sex metadata TSV. No manual fix needed.
 # ============================================================
 
 # ── ancestry_hmm / mod_vcf2ahmm parameters ───────────────────
-# Forwarded as CLI flags to mod_vcf2ahmm.py.
+# Passed as CLI flags to mod_vcf2ahmm.py (your unmodified script).
 hmm:
   recombination_rate: 1.0e-8    # -r  Morgans/bp
   min_distance_bp: 1000         # -m  min bp between adjacent kept SNPs
   min_allele_freq_diff: 0.1     # --min_diff  min freq diff between haplotypes
   use_genotypes: 0              # -g  0 = use read counts, 1 = use genotypes
 
-# ── SPORE output settings ─────────────────────────────────────
+# ── SPORE / TRUFFLE parameters ────────────────────────────────
+# These are written verbatim into the auto-generated SPORE-Settings.R.
+# See SPORE README for parameter descriptions.
 spore:
-  output_prefix: "brood1_final"
+  # ── TRUFFLE executable ──────────────────────────────────────
+  # Path to the truffle binary on your system.
+  # If you put it in the repo at tools/truffle, use:
+  #   truffle_path: "tools/truffle"
+  # Otherwise provide the absolute path on your machine.
+  truffle_path: "tools/truffle"
+
+  # ── TRUFFLE filters ─────────────────────────────────────────
+  truffle_maf: 0.05             # minor allele frequency filter
+  truffle_missing: 0.95         # max missingness allowed
+
+  # ── SPORE sensitivity ───────────────────────────────────────
+  # APO = assumed number of offspring per individual.
+  # Think of it as the average expected family size in this
+  # population. Affects detection sensitivity.
+  APO: 24
+
+  # ── Sampling mode ───────────────────────────────────────────
+  intermediate_sampling_mode: FALSE   # TRUE = Extensive, FALSE = Intermediate
+
+  # ── Memory / parallelism ────────────────────────────────────
+  max_memory: "4G"
+  max_cores: 4
+
+  # ── Output settings ─────────────────────────────────────────
+  # Label used by SPORE when naming its own output files
+  # (e.g. <label>-truffle.ibd). Does NOT affect the input VCF name.
+  output_label: "YHPed1_brood1"          # prefix for SPORE output files
+  pedigree_file_add_name: ""          # optional suffix to distinguish runs
+  plots: TRUE                         # save IBD threshold plots
+
+  # ── Filtering thresholds ────────────────────────────────────
+  min_loci: 1                         # min overlapping loci to include a pair
+  IBD2_DP_threshold: 0.95             # IBD2 % above which = duplicate sample
+  downsample_for_homozygous_mendel: 1 # downsampling to reduce memory load
+
+  # ── Optional inputs ─────────────────────────────────────────
+  birthdate_file: ""                  # leave empty if no birthdates available
+  extra_variables: "none"             # path to extra variables file or "none"
+
+  # ── Advanced: disable default SPORE variables ───────────────
+  no_IBD0: FALSE
+  no_IQR: FALSE
+  no_HM: FALSE
+
+  # ── Advanced: resume a previous partial run ─────────────────
+  # Set to TRUE only if re-running after a previous partial run.
+  previously_computed: FALSE
+  previously_computed_homozygous_mendel: FALSE
+  previously_computed_mendel: FALSE
+  previously_computed_three_thresholds: FALSE
 
 # ── Sample population and sex assignments ─────────────────────
+# Parents appear TWICE (one entry per haplotype contributed).
+# Offspring appear ONCE with population: admixed.
 populations:
 
-  # ── Female parent (contributes maternal haplotypes 0 and 1) ──
+  # ── Female parent ────────────────────────────────────────────
   - sample: "YH_006_f"
     population: 0        # maternal haplotype 1
     sex: F
@@ -81,7 +135,7 @@ populations:
     population: 1        # maternal haplotype 2
     sex: F
 
-  # ── Male parent (contributes paternal haplotypes 2 and 3) ────
+  # ── Male parent ──────────────────────────────────────────────
   - sample: "YH_011_m"
     population: 2        # paternal haplotype 1
     sex: M
