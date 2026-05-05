@@ -77,38 +77,45 @@ Rscript src/SPORE.R config/SPORE-Settings.R
 
 ## Pipeline Workflow
 **Phasing**
-    - Input: FilteredSNVs.vcf
-    - Output: conserved_phased.vcf
-    *Identifies conserved informative SNVs*
+- Input: FilteredSNVs.vcf
+- Output: conserved_phased.vcf
+*Identifies conserved informative SNVs*
+
 **Ancestry Inference (HMM)**
-    - Input: ancestry_input.txt
-    - Output: .posterior
-    *Computes local ancestry probabilities*
+- Input: ancestry_input.txt
+- Output: .posterior
+*Computes local ancestry probabilities*
+
 **Admixture Analysis (SPORE)**
-    - Input: Genomics_Sex.tsv
-    - Output: truffle.ibd
-    *Detects IBD segments*
+- Input: Genomics_Sex.tsv
+- Output: truffle.ibd
+*Detects IBD segments*
+
 **IBD Ranking**
-    - Input: truffle.ibd
-    - Output: inbreeding_rankings.txt
-    *Produces ranked relatedness scores*
+- Input: truffle.ibd
+- Output: inbreeding_rankings.txt
+*Produces ranked relatedness scores*
 
 ---
 
 ## Example Output
 .posterior — Local ancestry probabilities per site
+
 truffle.ibd — IBD segment calls
+
 inbreeding_rankings.txt — Ranked relatedness metrics
 
 ---
 
 ## Troubleshooting
 *Sample Name Formatting*
-    SPORE requires sample IDs without underscores.
+SPORE requires sample IDs without underscores.
+
 *Unexpected LG10 Results*
-    Verify HMM pulse parameters (-p) match expected admixture history.
+Verify HMM pulse parameters (-p) match expected admixture history.
+
 *Dependency Issues*
-    Ensure the Conda environment is active before running any scripts.
+Ensure the Conda environment is active before running any scripts.
 
 ---
 
@@ -125,7 +132,9 @@ This project is licensed under the MIT License.
 ## Contact
 
 Lauren Sabo
+
 Bioinformatics MS Student, McGrath Lab
 
 Email: lsabo8@gatech.edu
+
 GitHub: https://github.com/laurengsabo
