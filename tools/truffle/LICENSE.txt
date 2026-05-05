@@ -1,0 +1,10 @@
+
+*** 
+*** This version of truffle is restricted to non-commercial  
+*** and educational use.
+***
+*** To obtain a commercial license or trial please contact us
+*** at sun @ utstat . toronto . edu
+*** 
+
+
