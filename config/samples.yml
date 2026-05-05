@@ -1,115 +1,117 @@
 # ============================================================
 #  FinPhaser — Sample Configuration  (config/samples.yml)
 # ============================================================
-#  This file, together with your VCF, is the only input the
-#  pipeline needs at run time:
+#  This file and your VCF are the only two inputs the pipeline
+#  needs. Sex metadata is now embedded here — you no longer
+#  need to maintain a separate Genomics_Sex.tsv file.
 #
+#  Run the full pipeline with:
 #    nextflow run main.nf -profile conda \
 #        --vcf         data/raw/YHPedigree1_FilteredSNVs.recode.vcf \
 #        --samples_yml config/samples.yml
 #
 # ── Biological context ───────────────────────────────────────
-#  This pipeline examines parental haplotype inheritance in
-#  Yellow Head cichlids (Aulonocara sp. 'Yellow Head').
+#  Yellow Head cichlid (Aulonocara sp. 'Yellow Head') x
+#  Mchenga conophoros backcross experiment.
 #
-#  A chromosomal inversion on LG10 is associated with sex
-#  determination. By backcrossing a male YH with Mchenga
-#  conophoros, the parental haplotypes on LG10 can be isolated
-#  and tracked in F1 offspring.
+#  A chromosomal inversion on LG10 is linked to sex
+#  determination. This cross isolates parental haplotypes so
+#  their inheritance in F1 offspring can be tracked.
 #
-#  We use ancestry_hmm to infer which parental haplotype each
-#  offspring inherited at each genomic position. We also run
-#  SPORE to assess IBD among offspring — important because the
-#  lab stock has been bred for many generations and inbreeding
-#  levels among the parents are unknown.
+#  ancestry_hmm: infers which parental haplotype each offspring
+#    inherited at each genomic site (uses population field).
+#
+#  SPORE: assesses IBD/inbreeding among offspring, because the
+#    lab stock has been inbred across many generations and the
+#    degree of inbreeding is unknown (uses sex field).
+#
+# ── VCF data flow ────────────────────────────────────────────
+#  ONE starting VCF → phased by PhaseParents_VCF.py → used for:
+#    a) mod_vcf2ahmm.py  →  ancestry_hmm  (AHMM branch)
+#    b) bgzip + tabix    →  SPORE          (IBD branch)
 #
 # ── Parent → haplotype mapping ───────────────────────────────
-#  Each parent is DIPLOID, so it contributes TWO haplotypes.
-#  The same parent sample therefore appears TWICE in the
-#  populations list, once per haplotype, matching ancestry_hmm's
-#  4-population model:
+#  Each diploid parent contributes TWO haplotypes, so it appears
+#  TWICE in the populations list (one entry per haplotype).
+#  Offspring appear ONCE with population: admixed.
 #
-#    YH_006_f  →  population 0  (maternal haplotype 1)
-#    YH_006_f  →  population 1  (maternal haplotype 2)
-#    YH_011_m  →  population 2  (paternal haplotype 1)
-#    YH_011_m  →  population 3  (paternal haplotype 2)
+#    YH_006_f  →  0  (maternal haplotype 1)
+#    YH_006_f  →  1  (maternal haplotype 2)
+#    YH_011_m  →  2  (paternal haplotype 1)
+#    YH_011_m  →  3  (paternal haplotype 2)
+#    offspring →  admixed
 #
-#  Offspring are labeled "admixed" — ancestry_hmm infers what
-#  combination of these 4 haplotypes each offspring carries at
-#  each genomic site.
+# ── Field guide ──────────────────────────────────────────────
+#  sample     : must EXACTLY match the VCF column header
+#  population : 0/1/2/3 (reference haplotype) or admixed
+#               parents appear twice, once per haplotype
+#               this field is used by ancestry_hmm only
+#  sex        : M or F
+#               used by SPORE only; set to null if unknown
 #
-# ── Population value guide ───────────────────────────────────
-#    0        = maternal haplotype 1  (YH_006_f, first copy)
-#    1        = maternal haplotype 2  (YH_006_f, second copy)
-#    2        = paternal haplotype 1  (YH_011_m, first copy)
-#    3        = paternal haplotype 2  (YH_011_m, second copy)
-#    admixed  = offspring — ancestry inferred by HMM
+# ── Notes ────────────────────────────────────────────────────
+#  YH_034, YH_035, YH_036 are absent from both the original
+#  popinfo and sex metadata and are excluded here.
 #
-# ── Sample name conventions ──────────────────────────────────
-#  Names here must EXACTLY match the VCF column headers.
-#  The Genomics_Sex.tsv uses a different format (no underscores:
-#  YH006f, YH011m, YH016, etc.) — this is expected and the
-#  pipeline handles the mismatch automatically.
-#  YH_034, YH_035, and YH_036 are absent from both the popinfo
-#  and the sex metadata and are therefore excluded here.
+#  Sample names in VCF use underscores (YH_006_f, YH_016, …).
+#  SPORE cannot handle underscores — the pipeline strips them
+#  automatically when writing the sex metadata TSV for SPORE.
 # ============================================================
 
-# ── SPORE settings ───────────────────────────────────────────
+# ── ancestry_hmm / mod_vcf2ahmm parameters ───────────────────
+# Forwarded as CLI flags to mod_vcf2ahmm.py.
+hmm:
+  recombination_rate: 1.0e-8    # -r  Morgans/bp
+  min_distance_bp: 1000         # -m  min bp between adjacent kept SNPs
+  min_allele_freq_diff: 0.1     # --min_diff  min freq diff between haplotypes
+  use_genotypes: 0              # -g  0 = use read counts, 1 = use genotypes
+
+# ── SPORE output settings ─────────────────────────────────────
 spore:
-  # Path to sex metadata TSV — columns: indv, GenomicsSex
-  # Sample names in this file use no underscores (YH006f, YH016…)
-  # The pipeline resolves the format difference automatically.
-  sex_metadata: "data/raw/Genomics_Sex.tsv"
   output_prefix: "brood1_final"
 
-# ── ancestry_hmm / mod_vcf2ahmm parameters ───────────────────
-# These are passed through to mod_vcf2ahmm.py and ancestry_hmm.
-hmm:
-  recombination_rate: 1.0e-8    # Morgans/bp  (-r flag)
-  min_distance_bp: 1000         # min bp between kept SNPs  (-m flag)
-  min_allele_freq_diff: 0.1     # min freq diff to keep a site  (--min_diff flag)
-  use_genotypes: 0              # 0 = use read counts, 1 = use genotypes  (-g flag)
-
-# ── Sample population assignments ────────────────────────────
-#  Parents appear TWICE — one entry per haplotype contributed.
-#  Offspring appear ONCE with population: admixed.
+# ── Sample population and sex assignments ─────────────────────
 populations:
 
-  # ── Female parent ────────────────────────────────────────
+  # ── Female parent (contributes maternal haplotypes 0 and 1) ──
   - sample: "YH_006_f"
-    population: 0          # maternal haplotype 1
+    population: 0        # maternal haplotype 1
+    sex: F
   - sample: "YH_006_f"
-    population: 1          # maternal haplotype 2
+    population: 1        # maternal haplotype 2
+    sex: F
 
-  # ── Male parent ──────────────────────────────────────────
+  # ── Male parent (contributes paternal haplotypes 2 and 3) ────
   - sample: "YH_011_m"
-    population: 2          # paternal haplotype 1
+    population: 2        # paternal haplotype 1
+    sex: M
   - sample: "YH_011_m"
-    population: 3          # paternal haplotype 2
+    population: 3        # paternal haplotype 2
+    sex: M
 
-  # ── Admixed offspring ─────────────────────────────────────
-  - { sample: "YH_016", population: admixed }
-  - { sample: "YH_017", population: admixed }
-  - { sample: "YH_018", population: admixed }
-  - { sample: "YH_019", population: admixed }
-  - { sample: "YH_020", population: admixed }
-  - { sample: "YH_021", population: admixed }
-  - { sample: "YH_022", population: admixed }
-  - { sample: "YH_023", population: admixed }
-  - { sample: "YH_024", population: admixed }
-  - { sample: "YH_025", population: admixed }
-  - { sample: "YH_026", population: admixed }
-  - { sample: "YH_027", population: admixed }
-  - { sample: "YH_028", population: admixed }
-  - { sample: "YH_029", population: admixed }
-  - { sample: "YH_030", population: admixed }
-  - { sample: "YH_031", population: admixed }
-  - { sample: "YH_032", population: admixed }
-  - { sample: "YH_033", population: admixed }
-  # YH_034, YH_035, YH_036 — absent from popinfo and sex metadata; excluded
-  - { sample: "YH_037", population: admixed }
-  - { sample: "YH_038", population: admixed }
-  - { sample: "YH_039", population: admixed }
-  - { sample: "YH_040", population: admixed }
-  - { sample: "YH_041", population: admixed }
-  - { sample: "YH_042", population: admixed }
+  # ── Admixed offspring ─────────────────────────────────────────
+  - { sample: "YH_016", population: admixed, sex: F }
+  - { sample: "YH_017", population: admixed, sex: F }
+  - { sample: "YH_018", population: admixed, sex: F }
+  - { sample: "YH_019", population: admixed, sex: F }
+  - { sample: "YH_020", population: admixed, sex: F }
+  - { sample: "YH_021", population: admixed, sex: F }
+  - { sample: "YH_022", population: admixed, sex: F }
+  - { sample: "YH_023", population: admixed, sex: F }
+  - { sample: "YH_024", population: admixed, sex: F }
+  - { sample: "YH_025", population: admixed, sex: M }
+  - { sample: "YH_026", population: admixed, sex: M }
+  - { sample: "YH_027", population: admixed, sex: M }
+  - { sample: "YH_028", population: admixed, sex: M }
+  - { sample: "YH_029", population: admixed, sex: M }
+  - { sample: "YH_030", population: admixed, sex: M }
+  - { sample: "YH_031", population: admixed, sex: F }
+  - { sample: "YH_032", population: admixed, sex: F }
+  - { sample: "YH_033", population: admixed, sex: F }
+  # YH_034, YH_035, YH_036 — absent from source data; excluded
+  - { sample: "YH_037", population: admixed, sex: M }
+  - { sample: "YH_038", population: admixed, sex: M }
+  - { sample: "YH_039", population: admixed, sex: M }
+  - { sample: "YH_040", population: admixed, sex: M }
+  - { sample: "YH_041", population: admixed, sex: M }
+  - { sample: "YH_042", population: admixed, sex: M }

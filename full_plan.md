@@ -47,7 +47,7 @@ ancestry_hmm -i ancestry_input.txt -s ahmm.ploidy \
  -p 3 -2 0.25
 
 Parameter Justification
--a 2 0.25 0.25 0.25 0.25: Specifies 2 ancestral populations with an initial starting admixture proportion of 50% for each. This assumes an even contribution from both parental sources.
+-a 2 0.25 0.25 0.25 0.25: Specifies 4 ancestral populations (haplotypes) with an initial starting admixture proportion of 25% for each haplotype. This assumes an even contribution from both parental sources and their haplotypes.
 
 -p 0 -2 0.25 (Pulse 0): Represents an ancient admixture event (~2 generations ago) (Paternal Haplotype 1).
 -p 1 -2 0.25 (Pulse 1): Represents an ancient admixture event (~2 generations ago) (Paternal Haplotype 2).

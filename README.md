@@ -276,10 +276,8 @@ results/
 ├── main.nf                  # Pipeline entry point
 ├── nextflow.config          # Profiles, resource limits, reporting
 ├── environment.yml          # Pinned conda environment
-├── Dockerfile               # Container definition (for -profile docker)
 ├── config/
 │   ├── samples.yml          # User-facing config: pop assignments + SPORE settings
-│   └── test_samples.yml     # Config for bundled test run
 ├── bin/                     # Pipeline helper scripts (called by Nextflow)
 │   ├── generate_spore_settings.py
 │   └── txt_to_tsv.py
