@@ -36,7 +36,7 @@ The entire pipeline runs in **a single command** via [Nextflow](https://www.next
 
 | Tool | Minimum version | Install |
 |------|----------------|---------|
-| Java | 11+ | `brew install openjdk` / system package manager |
+| Java | 11+ (Java 17 recommended) | `brew install openjdk` / system package manager |
 | Nextflow | 23.04+ | See below |
 | Conda or Mamba | any recent | [Miniforge](https://github.com/conda-forge/miniforge) recommended |
 
@@ -55,7 +55,7 @@ conda install -c conda-forge nextflow
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/FinPhaser.git
+git clone https://github.com/laurengsabo/FinPhaser.git
 cd FinPhaser
 ```
 
