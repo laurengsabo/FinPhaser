@@ -6,7 +6,7 @@
 #
 #  Run the full pipeline with:
 #    nextflow run main.nf -profile conda \
-#        --vcf         data/raw/YHPedigree1_FilteredSNVs.recode.vcf \
+#        --vcf         data/raw/YHPedigree1_FilteredSNVs_quarter.recode.vcf \
 #        --samples_yml config/samples.yml
 #
 # ── Biological context ───────────────────────────────────────
@@ -61,7 +61,7 @@
 # ── Input VCF ────────────────────────────────────────────────
 # Path to the starting VCF. Relative to the repo root or absolute.
 # This is the only place you need to change when switching VCF files.
-vcf: "data/raw/YHPedigree1_FilteredSNVs.recode.vcf"
+vcf: "data/raw/YHPedigree1_FilteredSNVs_quarter.recode.vcf"
 
 # ── Chromosome → linkage group mapping ───────────────────────
 # Used by PhaseParents_VCF.py to rename CHROM values in the output VCF.
