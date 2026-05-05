@@ -16,14 +16,16 @@ channels:
 dependencies:
   # ── Core language runtimes ──────────────────────────────────
   - python=3.12
-  - r-base=4.3.3
+  - r-base=3.6.3
+  - git
+  - gzip
 
   # ── Workflow manager ────────────────────────────────────────
   - nextflow=24.04.4
 
   # ── Bioinformatics tools ────────────────────────────────────
   - ancestry_hmm=1.0.2
-  - bcftools=1.21
+  - bcftools=1.10
   - htslib=1.21           # provides bgzip and tabix (used by COMPRESS_VCF)
   - selam=0.9
 
@@ -38,5 +40,12 @@ dependencies:
   # stdlib-only YAML parsing to avoid import errors in edge cases.
 
   # ── R packages ──────────────────────────────────────────────
-  - r-ggplot2=3.5.1
-  - r-dplyr=1.1.4
+  - r-ggplot2=3.3.2
+  - r-dplyr=1.0.2
+  - r-readr=1.4.0 
+  - r-stringr=1.4.0
+  - r-tidyr=1.1.2 
+  - r-data.table=1.13.2
+  - r-naturalsort=0.1.3 
+  - r-sys=3.4 
+  - r-r.utils
