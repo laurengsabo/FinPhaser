@@ -58,6 +58,43 @@
 #  sex metadata TSV. No manual fix needed.
 # ============================================================
 
+# ── Input VCF ────────────────────────────────────────────────
+# Path to the starting VCF. Relative to the repo root or absolute.
+# This is the only place you need to change when switching VCF files.
+vcf: "data/raw/YHPedigree1_FilteredSNVs.recode.vcf"
+
+# ── Chromosome → linkage group mapping ───────────────────────
+# Used by PhaseParents_VCF.py to rename CHROM values in the output VCF.
+# Keys   : chromosome IDs as they appear in your VCF (CHROM column)
+# Values : linkage group names to use in the output
+#
+# This mapping is for the Aulonocara 'Yellow Head' reference genome.
+# Edit the values if you are using a different assembly or naming scheme.
+# To add or remove chromosomes, add or remove lines here.
+# The pipeline extracts this block at runtime — no script edits needed.
+linkage_groups:
+  NC_036780.1: LG1
+  NC_036781.1: LG2
+  NC_036782.1: LG3
+  NC_036783.1: LG4
+  NC_036784.1: LG5
+  NC_036785.1: LG6
+  NC_036786.1: LG7
+  NC_036787.1: LG8
+  NC_036788.1: LG9
+  NC_036789.1: LG10
+  NC_036790.1: LG11
+  NC_036791.1: LG12
+  NC_036792.1: LG13
+  NC_036793.1: LG14
+  NC_036794.1: LG15
+  NC_036796.1: LG17
+  NC_036797.1: LG18
+  NC_036798.1: LG19
+  NC_036799.1: LG20
+  NC_036800.1: LG22
+  NC_036801.1: LG23
+
 # ── ancestry_hmm / mod_vcf2ahmm parameters ───────────────────
 # Passed as CLI flags to mod_vcf2ahmm.py (your unmodified script).
 hmm:

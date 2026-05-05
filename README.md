@@ -26,7 +26,7 @@ The framework integrates:
 
 It is particularly suited for studying **complex sex determination systems**, including ZW/XY dynamics on the LG10 linkage group in *Aulonocara* 'Yellow Head'. By backcrossing a male YH with *Mchenga conophoros*, parental haplotypes on LG10 can be isolated and tracked in F1 offspring. SPORE is used to assess IBD among offspring, quantifying inbreeding accumulated across many generations of lab-bred stock.
 
-The entire pipeline runs in **a single command** via [Nextflow](https://www.nextflow.io/), requiring only two input files: a filtered VCF and a samples YAML.
+The entire pipeline runs in **a single command** via [Nextflow](https://www.nextflow.io/), requiring only **one input file**: `config/samples.yml`, which contains the VCF path and all pipeline settings.
 
 ---
 
@@ -46,7 +46,7 @@ The entire pipeline runs in **a single command** via [Nextflow](https://www.next
 curl -s https://get.nextflow.io | bash
 sudo mv nextflow /usr/local/bin/
 
-# Option B — via conda (already included in environment.yml)
+# Option B — via conda
 conda install -c conda-forge nextflow
 ```
 
@@ -61,13 +61,14 @@ cd FinPhaser
 
 ---
 
-### 2. Place your input files
+### 2. Place your input VCF
 
 ```bash
-# Your starting VCF — the only genomic input needed
 mkdir -p data/raw
 cp /path/to/YHPedigree1_FilteredSNVs.recode.vcf data/raw/
 ```
+
+Then set the path in `config/samples.yml` (see Step 4a below). This is the only genomic input the pipeline needs.
 
 ---
 
@@ -89,9 +90,17 @@ Nextflow will automatically:
 
 ### 4. Configure your samples
 
-All pipeline configuration lives in `config/samples.yml`. The two things to set for your data:
+All pipeline configuration lives in `config/samples.yml`. Edit it before running.
 
-**a) Population assignments** — each diploid parent appears **twice** (once per haplotype it contributes). Offspring are marked `admixed`.
+**a) Set your VCF path** — this is how you tell the pipeline which file to use:
+
+```yaml
+vcf: "data/raw/YHPedigree1_FilteredSNVs.recode.vcf"
+```
+
+To run on a different VCF, change this one line. Nothing else needs to be edited.
+
+**b) Population assignments** — each diploid parent appears **twice** (once per haplotype it contributes). Offspring are marked `admixed`.
 
 ```yaml
 populations:
@@ -116,7 +125,7 @@ populations:
   - { sample: "YH_017", population: admixed, sex: M }
 ```
 
-**b) TRUFFLE path** — point to the binary placed in `tools/truffle/`:
+**c) TRUFFLE path** — point to the binary placed in `tools/truffle/`:
 
 ```yaml
 spore:
@@ -133,7 +142,7 @@ Sex metadata (`Genomics_Sex.tsv`) is **generated automatically** at runtime from
 nextflow run main.nf -profile conda
 ```
 
-Nextflow will automatically handle all software dependencies using Conda.
+Nextflow handles all software dependencies automatically using the per-process conda environments.
 
 **Resume after a failure** (completed steps are not re-run):
 ```bash
@@ -151,7 +160,7 @@ nextflow run main.nf -profile test
 
 | Profile | Description |
 |---------|-------------|
-| `conda` | Local conda environment — recommended default |
+| `conda` | Per-process conda environments — recommended default |
 | `mamba` | Same as conda but uses mamba for faster solves |
 | `test` | Runs bundled test dataset; completes in minutes |
 
@@ -169,11 +178,14 @@ This design avoids dependency conflicts and ensures consistent results across sy
 
 ## Pipeline Workflow
 
-One starting VCF feeds both the ancestry and IBD branches after phasing:
+One starting VCF (declared in `samples.yml`) feeds both the ancestry and IBD branches after phasing:
 
 ```
+config/samples.yml  ←─ vcf: path + all settings
+        │
+        │  VCF path read at startup
+        ▼
 YHPedigree1_FilteredSNVs.recode.vcf
-config/samples.yml
         │
         ▼
 ┌──────────────────────────────────────┐
@@ -222,33 +234,47 @@ config/samples.yml
 ```
 
 **Key design decisions:**
+- The VCF path is declared in `samples.yml` under `vcf:` — it is the single source of truth for the input file. No CLI flags or config edits are needed when switching VCF files.
 - Steps 2 and 3 are combined: `bin/yaml_to_popinfo.py` converts `samples.yml` into the tab-separated population info file that `mod_vcf2ahmm.py` reads via its `-s` flag. `mod_vcf2ahmm.py` is **not modified**.
-- Sex metadata is generated at runtime by `bin/yaml_to_sex_tsv.py` — no separate `Genomics_Sex.tsv` file needed as input.
+- The chromosome → linkage group mapping is declared in `samples.yml` under `linkage_groups:` and extracted at runtime by `bin/yaml_to_linkage_map.py`. To use a different reference assembly, edit the mapping there.
+- Sex metadata is generated at runtime by `bin/yaml_to_sex_tsv.py` — no separate `Genomics_Sex.tsv` file needed.
 - Underscores are stripped from sample names automatically before SPORE runs.
-- SPORE-Settings.R is fully auto-generated from `samples.yml` — no manual editing required.
+- `SPORE-Settings.R` is fully auto-generated from `samples.yml` — no manual editing required.
 
 ---
 
 ## Inputs
 
-Only two files are required to start the pipeline:
+Only **one file** is required to start the pipeline:
 
 | File | Description |
 |------|-------------|
-| `data/raw/YHPedigree1_FilteredSNVs.recode.vcf` | Raw filtered SNV VCF — the only genomic input |
-| `config/samples.yml` | All configuration: population assignments, sex, HMM params, SPORE settings |
+| `config/samples.yml` | All configuration: VCF path, population assignments, sex, linkage groups, HMM params, SPORE settings |
+
+The VCF itself is referenced inside `samples.yml` under the `vcf:` key and must be present at the path specified.
 
 ### samples.yml structure
 
 ```yaml
-# HMM parameters — forwarded to mod_vcf2ahmm.py
+# ── Input VCF ─────────────────────────────────────────────────
+# Change this line to run on a different VCF file
+vcf: "data/raw/YHPedigree1_FilteredSNVs.recode.vcf"
+
+# ── Chromosome → linkage group mapping ────────────────────────
+# Edit for a different reference assembly
+linkage_groups:
+  NC_036780.1: LG1
+  NC_036789.1: LG10
+  # ... (see config/samples.yml for full list)
+
+# ── HMM parameters — forwarded to mod_vcf2ahmm.py ─────────────
 hmm:
   recombination_rate: 1.0e-8
   min_distance_bp: 1000
   min_allele_freq_diff: 0.1
   use_genotypes: 0
 
-# SPORE / TRUFFLE settings
+# ── SPORE / TRUFFLE settings ───────────────────────────────────
 spore:
   truffle_path: "tools/truffle/truffle"
   truffle_maf: 0.05
@@ -260,7 +286,7 @@ spore:
   plots: TRUE
   # ... (see config/samples.yml for full parameter list)
 
-# Sample assignments
+# ── Sample assignments ─────────────────────────────────────────
 # population → used by AHMM only
 # sex        → used by SPORE only
 populations:
@@ -301,11 +327,12 @@ All outputs land in `results/`:
 results/
 ├── ancestry/
 │   ├── 01_phased/
-│   │   └── YHPed1_conserved_phased.vcf
+│   │   ├── YHPed1_conserved_phased.vcf
+│   │   └── linkage_map.tsv              # extracted from samples.yml; saved for inspection
 │   ├── 02_hmm_input/
 │   │   ├── ancestry_input.txt
 │   │   ├── ahmm.ploidy
-│   │   └── mod_popinfo.txt          # generated from samples.yml; saved for inspection
+│   │   └── mod_popinfo.txt              # generated from samples.yml; saved for inspection
 │   ├── 03_posteriors/
 │   │   └── YH_016.posterior ... YH_042.posterior
 │   └── ancestry_summary_report/
@@ -320,7 +347,7 @@ results/
 │   ├── 06_spore_output/
 │   │   ├── YHPed1_conserved_phased.vcf.gz-truffle.ibd
 │   │   ├── SPORE_output.log
-│   │   └── SPORE-Settings.R         # saved for full reproducibility
+│   │   └── SPORE-Settings.R                   # saved for full reproducibility
 │   └── 07_rankings/
 │       ├── inbreeding_rankings.txt
 │       └── inbreeding_rankings.tsv
@@ -349,20 +376,21 @@ results/
 ├── bin/                            # Helper scripts called by Nextflow processes
 │   ├── generate_spore_settings.py  # Writes complete SPORE-Settings.R from samples.yml
 │   ├── txt_to_tsv.py               # Converts rank_ibd .txt output to .tsv
+│   ├── yaml_to_linkage_map.py      # Extracts linkage_groups → TSV for PhaseParents_VCF.py
 │   ├── yaml_to_popinfo.py          # Converts samples.yml → mod_popinfo.txt for mod_vcf2ahmm.py
 │   └── yaml_to_sex_tsv.py          # Converts samples.yml → Genomics_Sex.tsv for SPORE
 ├── config/
-│   └── samples.yml                 # All user config: populations, sex, HMM + SPORE params
+│   └── samples.yml                 # Single config entry point: VCF path + all settings
 ├── data/
 │   ├── raw/
-│   │   └── YHPedigree1_FilteredSNVs.recode.vcf   # Starting VCF (only genomic input)
+│   │   └── YHPedigree1_FilteredSNVs.recode.vcf   # Starting VCF (path declared in samples.yml)
 │   └── test/                       # Bundled test dataset
 ├── docs/                           # Architecture diagrams and notes
 ├── envs/
-│   ├── finphaser.yml               # finphaser conda init
-│   └── spore.yml                   # spore conda init
+│   ├── finphaser.yml               # Python + ancestry_hmm + bcftools (all non-SPORE steps)
+│   └── spore.yml                   # R 3.6.3 + SPORE dependencies (RUN_SPORE only)
 ├── main.nf                         # Pipeline entry point
-├── nextflow.config                 # Profiles, resource limits, reporting
+├── nextflow.config                 # Profiles, per-process env assignments, resource limits
 ├── src/
 │   ├── ancestry/
 │   │   ├── PhaseParents_VCF.py     # Step 1 — phase parental genotypes
@@ -391,7 +419,7 @@ results/
 ## Troubleshooting
 
 **`import allel` error**
-`PhaseParents_VCF.py` requires `scikit-allel`. Ensure the conda environment was built from the current `environment.yml` (`scikit-allel=1.3.7` is pinned there) and is active.
+`PhaseParents_VCF.py` requires `scikit-allel`. This is pinned in `envs/finphaser.yml`. If you see this error, ensure Nextflow is using the `-profile conda` flag so it activates the correct per-process environment.
 
 **TRUFFLE binary not found**
 Ensure `tools/truffle/truffle` exists and is executable:
@@ -404,7 +432,14 @@ The path in `config/samples.yml` under `spore.truffle_path` must match exactly.
 SPORE cannot handle underscores in sample IDs. FinPhaser strips them automatically when generating `Genomics_Sex.tsv` — no manual renaming needed in your VCF or `samples.yml`.
 
 **`data/raw/Genomics_Sex.tsv` not needed**
-If you have this file from a previous manual run, you can safely remove it. Sex metadata is now read from `samples.yml` and the TSV is generated automatically at runtime.
+If you have this file from a previous manual run, you can safely remove it. Sex metadata is read from `samples.yml` and the TSV is generated automatically at runtime.
+
+**Switching to a different VCF**
+Edit the `vcf:` key in `config/samples.yml`:
+```yaml
+vcf: "data/raw/my_other_file.vcf"
+```
+No other files need to be changed.
 
 **Unexpected LG10 results**
 Verify the HMM pulse parameters in `config/samples.yml` match your crossing design. The default (`-p 0..3 -2 0.25`) assumes ~2 generations of admixture.

@@ -5,18 +5,23 @@
  *  Ancestry inference subworkflow.
  *
  *  Step 1 — PHASE_PARENTS
+ *    Helper : bin/yaml_to_linkage_map.py
+ *      Extracts the linkage_groups block from samples.yml and
+ *      writes linkage_map.tsv — passed to PhaseParents_VCF.py
+ *      via --linkage-map so the mapping is versioned in the repo
+ *      and not hardcoded in the script.
  *    Script : src/ancestry/PhaseParents_VCF.py
- *    CLI    : python PhaseParents_VCF.py <VCFFile> --out <outname>
- *    In     : YHPedigree1_FilteredSNVs.recode.vcf
+ *    CLI    : python PhaseParents_VCF.py <VCFFile>
+ *                 --out <outname> --linkage-map linkage_map.tsv
+ *    In     : raw filtered VCF + samples.yml
  *    Out    : YHPed1_conserved_phased.vcf
+ *             linkage_map.tsv  (saved for reproducibility)
  *
  *  Step 2+3 — PREPARE_HMM_INPUT  (combined into one process)
  *    Helper : bin/yaml_to_popinfo.py
  *      Reads samples.yml → writes mod_popinfo.txt in the exact
  *      format mod_vcf2ahmm.py expects (-s flag input).
- *      Replaces ancestry_input.py (which only supported 2 pops
- *      and inferred assignments from name suffixes).
- *    Script : src/ancestry/mod_vcf2ahmm.py  (YOUR original script, unmodified)
+ *    Script : src/ancestry/mod_vcf2ahmm.py  (original, unmodified)
  *      CLI  : python mod_vcf2ahmm.py -v <vcf> -s <popinfo>
  *                 -o_txt ancestry_input.txt -o_ploidy ahmm.ploidy
  *                 -g <int> -r <float> -m <int> --min_diff <float>
@@ -48,16 +53,36 @@ process PHASE_PARENTS {
 
     input:
     path vcf
+    path samples_yml
 
     output:
     path "YHPed1_conserved_phased.vcf", emit: phased_vcf
+    path "linkage_map.tsv",             emit: linkage_map  // saved for reproducibility
 
     script:
-    // PhaseParents_VCF.py positional arg = VCFFile, --out sets output name
+    /*
+     * yaml_to_linkage_map.py reads the linkage_groups: block from
+     * samples.yml and writes a two-column TSV:
+     *     NC_036780.1<TAB>LG1
+     *     NC_036781.1<TAB>LG2
+     *     ...
+     *
+     * That TSV is then passed to PhaseParents_VCF.py via --linkage-map,
+     * replacing the hardcoded dict in the original script. If the
+     * linkage_groups block is ever absent from samples.yml, the script
+     * exits with a clear error rather than silently using old values.
+     */
     """
+    # Extract linkage group mapping from samples.yml
+    python ${projectDir}/bin/yaml_to_linkage_map.py \
+        --samples-yml ${samples_yml} \
+        --out         linkage_map.tsv
+
+    # Phase and filter the VCF using the extracted mapping
     python ${projectDir}/src/ancestry/PhaseParents_VCF.py \
         ${vcf} \
-        --out YHPed1_conserved_phased.vcf
+        --out          YHPed1_conserved_phased.vcf \
+        --linkage-map  linkage_map.tsv
     """
 }
 
@@ -88,13 +113,10 @@ process PREPARE_HMM_INPUT {
      *       YH_011_m<TAB>3
      *       YH_016<TAB>admixed
      *       ...
-     *   This replaces the original ancestry_input.py, which only supported
-     *   2 populations and inferred assignments from _f/_m name suffixes.
      *
-     * Step 3 (mod_vcf2ahmm.py — YOUR original script, not modified):
+     * Step 3 (mod_vcf2ahmm.py — original script, not modified):
      *   Uses its real CLI flags exactly as documented in the script header.
-     *   HMM parameters are read from nextflow.config (params.hmm_*) so they
-     *   can be overridden from the command line without editing files.
+     *   HMM parameters come from nextflow.config (params.hmm_*).
      */
     """
     # Step 2: convert samples.yml → mod_popinfo.txt
@@ -104,13 +126,13 @@ process PREPARE_HMM_INPUT {
 
     # Step 3: convert phased VCF + popinfo → ancestry_hmm input files
     python ${projectDir}/src/ancestry/mod_vcf2ahmm.py \
-        -v        ${phased_vcf}                  \
-        -s        mod_popinfo.txt                \
-        -o_txt    ancestry_input.txt             \
-        -o_ploidy ahmm.ploidy                    \
-        -g        ${params.hmm_use_genotypes}    \
+        -v        ${phased_vcf}                    \
+        -s        mod_popinfo.txt                  \
+        -o_txt    ancestry_input.txt               \
+        -o_ploidy ahmm.ploidy                      \
+        -g        ${params.hmm_use_genotypes}      \
         -r        ${params.hmm_recombination_rate} \
-        -m        ${params.hmm_min_distance_bp}  \
+        -m        ${params.hmm_min_distance_bp}    \
         --min_diff ${params.hmm_min_allele_freq_diff}
     """
 }
@@ -142,8 +164,7 @@ process RUN_ANCESTRY_HMM {
      *   pop 3 = paternal haplotype 2  (YH_011_m, allele 2)
      *
      * -a 4 0.25 0.25 0.25 0.25   equal prior on all 4 haplotypes
-     * -p 0..3  -2  0.25          each pulse ~2 generations back,
-     *                             equal initial proportion
+     * -p 0..3  -2  0.25          each pulse ~2 generations back
      */
     """
     ancestry_hmm \
@@ -165,18 +186,16 @@ process ANCESTRY_SUMMARY {
     publishDir "${params.outdir}/ancestry", mode: 'copy'
 
     input:
-    // .collect() stages all *.posterior files into the same working directory
-    path posterior_files
+    path posterior_files    // .collect() stages all *.posterior into cwd
 
     output:
     path "ancestry_summary_report/", emit: summary_dir
 
     script:
     /*
-     * SNV_count.py takes a single positional argument: the directory
-     * containing *.posterior files. It always writes output to
-     * ./ancestry_summary_report/ relative to its working directory.
-     * We pass "." because Nextflow has staged all files into cwd.
+     * SNV_count.py takes one positional arg: the directory with *.posterior
+     * files. It always writes to ./ancestry_summary_report/ in cwd.
+     * We pass "." because Nextflow staged all files here.
      */
     """
     python ${projectDir}/src/ancestry/SNV_count.py .
@@ -194,22 +213,22 @@ workflow ANCESTRY_WORKFLOW {
 
     main:
 
-    // Step 1
-    PHASE_PARENTS(ch_vcf)
+    // Step 1 — phase parents (linkage map extracted from samples.yml)
+    PHASE_PARENTS(ch_vcf, ch_samples_yml)
 
-    // Steps 2 + 3
+    // Steps 2 + 3 — build popinfo then run mod_vcf2ahmm.py
     PREPARE_HMM_INPUT(
         PHASE_PARENTS.out.phased_vcf,
         ch_samples_yml
     )
 
-    // Step 4
+    // Step 4 — run ancestry_hmm
     RUN_ANCESTRY_HMM(
         PREPARE_HMM_INPUT.out.ancestry_input,
         PREPARE_HMM_INPUT.out.ploidy_file
     )
 
-    // Step 5 — collect all *.posterior into one staging dir before summary
+    // Step 5 — summarise posteriors (collect all files first)
     ANCESTRY_SUMMARY(
         RUN_ANCESTRY_HMM.out.posterior_files.collect()
     )
