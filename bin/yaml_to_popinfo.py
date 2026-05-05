@@ -10,7 +10,7 @@ on name suffixes (_f → 0, _m → 1) and only supported 2 populations.
 yaml_to_popinfo.py reads the explicit 4-haplotype assignments from
 samples.yml and writes them in the same format mod_vcf2ahmm.py requires.
 
-Output format (identical to the original mod_popinfo.txt):
+Output format (identical to the original mod_popinfo.txt)(example of example data output):
     YH_006_f<TAB>0
     YH_006_f<TAB>1
     YH_011_m<TAB>2

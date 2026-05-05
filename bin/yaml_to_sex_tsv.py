@@ -7,14 +7,14 @@ fields embedded in samples.yml.
 
 This replaces the need to maintain a separate Genomics_Sex.tsv file.
 
-Output format (matches the original Genomics_Sex.tsv exactly):
+Output format (matches the original Genomics_Sex.tsv exactly) (example of example data output):
     indv<TAB>GenomicsSex
     YH011m<TAB>M
     YH006f<TAB>F
     YH016<TAB>F
     ...
 
-Naming sanitisation applied here:
+Naming sanitisation applied here (usign example data):
   - VCF sample names use underscores: YH_006_f, YH_011_m, YH_016
   - SPORE cannot handle underscores in sample IDs
   - This script strips all underscores when writing the TSV:

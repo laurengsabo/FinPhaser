@@ -97,7 +97,7 @@ spore:
   # ── Output settings ─────────────────────────────────────────
   # Label used by SPORE when naming its own output files
   # (e.g. <label>-truffle.ibd). Does NOT affect the input VCF name.
-  output_label: "YHPed1_brood1"          # prefix for SPORE output files
+  output_label: "YHPed1_spore"          # prefix for SPORE output files
   pedigree_file_add_name: ""          # optional suffix to distinguish runs
   plots: TRUE                         # save IBD threshold plots
 
