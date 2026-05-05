@@ -45,63 +45,64 @@ from pathlib import Path
 # samples.yml is simple enough that we can parse it without pyyaml.
 # We only need the populations list, which is a flat sequence of mappings.
 
+def strip_comment(value: str) -> str:
+    return value.split("#")[0].strip()
+
 def parse_populations(yml_path: Path) -> list:
-    """
-    Parse only the `populations:` block from samples.yml.
-
-    Returns a list of dicts, each with at least 'sample' and 'population'.
-    Supports both block style and flow style (inline {}) entries.
-
-    This parser is intentionally minimal — it handles the specific structure
-    of FinPhaser's samples.yml and is not a general YAML parser.
-    """
     text = yml_path.read_text()
     populations = []
-    in_populations = False
+    current = None
+    in_pop = False
 
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
+    for raw in text.splitlines():
+        line = raw.rstrip()
 
-        # Detect the populations block
-        if line == "populations:":
-            in_populations = True
+        if line.strip() == "populations:":
+            in_pop = True
             continue
 
-        # Stop at the next top-level key (unindented, ends with colon)
-        if in_populations and line and not line.startswith("-") and not line.startswith("#"):
-            if ":" in line and not line.startswith(" "):
-                in_populations = False
-                continue
-
-        if not in_populations:
+        if in_pop and line and not line.startswith(" ") and ":" in line and not line.strip().startswith("-"):
+            # hit next top-level section → stop
+            in_pop = False
             continue
 
-        # Skip blank lines and comments
-        if not line or line.startswith("#"):
+        if not in_pop:
             continue
 
-        # ── Flow style: - { sample: "X", population: 0, sex: F } ─────────────
-        if line.startswith("- {") and "}" in line:
-            inner = line[line.index("{") + 1: line.index("}")]
-            entry = {}
+        if line.strip().startswith("- sample:"):
+            if current:
+                populations.append(current)
+
+            current = {}
+
+            val = line.split(":", 1)[1]
+            current["sample"] = strip_comment(val).strip().strip('"').strip("'")
+            continue
+            
+        # inline "- { ... }" case
+        if "{" in line and "}" in line:
+            if current:
+                populations.append(current)
+
+            current = {}
+
+            inner = line[line.index("{")+1:line.index("}")]
             for part in inner.split(","):
                 if ":" in part:
                     k, v = part.split(":", 1)
-                    entry[k.strip()] = v.strip().strip('"').strip("'")
-            if "sample" in entry and "population" in entry:
-                populations.append(entry)
+                    current[k.strip()] = strip_comment(v).strip().strip('"').strip("'")
+
+            populations.append(current)
+            current = None
             continue
 
-        # ── Block style: starts a new list item ───────────────────────────────
-        if line.startswith("- sample:"):
-            val = line.split(":", 1)[1].strip().strip('"').strip("'")
-            populations.append({"sample": val})
-            continue
-
-        # ── Block style: continuation key under a list item ──────────────────
-        if populations and ":" in line and not line.startswith("-"):
+        # continuation lines (indented fields)
+        if ":" in line and current is not None:
             k, v = line.split(":", 1)
-            populations[-1][k.strip()] = v.strip().strip('"').strip("'")
+            current[k.strip()] = v.strip().strip('"').strip("'")
+
+    if current:
+        populations.append(current)
 
     return populations
 
@@ -146,6 +147,10 @@ def main():
     out_path = Path(args.out)
     with open(out_path, "w") as fh:
         for entry in populations:
+
+            # clean inline comments from population field
+            entry["population"] = strip_comment(str(entry["population"]))
+
             fh.write(f"{entry['sample']}\t{entry['population']}\n")
 
     print(
