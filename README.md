@@ -43,6 +43,7 @@ conda activate FinPhaser
 python src/ancestry/PhaseParents_VCF.py data/raw/YHPedigree1_FilteredSNVs.recode.vcf
 ancestry_hmm -i ancestry_input.txt -s ahmm.ploidy -a 4 0.25 0.25 0.25 0.25
 Rscript src/SPORE.R config/SPORE-Settings.R
+```
 
 ---
 
@@ -55,7 +56,9 @@ Rscript src/SPORE.R config/SPORE-Settings.R
 
 ---
 
-#Repository Structure
+## Repository Structure
+
+```
 .
 ├── config/             # Parameter files (e.g., SPORE-Settings.R)
 ├── data/
@@ -68,49 +71,61 @@ Rscript src/SPORE.R config/SPORE-Settings.R
 │   ├── reporting/      # IBD ranking + summaries
 │   └── SPORE.R         # Admixture analysis
 └── environment.yml     # Conda environment
+```
 
-#Pipeline Workflow
-Phasing
-Input: FilteredSNVs.vcf
-Output: conserved_phased.vcf
-Identifies conserved informative SNVs
-Ancestry Inference (HMM)
-Input: ancestry_input.txt
-Output: .posterior
-Computes local ancestry probabilities
-Admixture Analysis (SPORE)
-Input: Genomics_Sex.tsv
-Output: truffle.ibd
-Detects IBD segments
-IBD Ranking
-Input: truffle.ibd
-Output: inbreeding_rankings.txt
-Produces ranked relatedness scores
+---
 
-# Example Output
+## Pipeline Workflow
+**Phasing**
+    - Input: FilteredSNVs.vcf
+    - Output: conserved_phased.vcf
+    *Identifies conserved informative SNVs*
+**Ancestry Inference (HMM)**
+    - Input: ancestry_input.txt
+    - Output: .posterior
+    *Computes local ancestry probabilities*
+**Admixture Analysis (SPORE)**
+    - Input: Genomics_Sex.tsv
+    - Output: truffle.ibd
+    *Detects IBD segments*
+**IBD Ranking**
+    - Input: truffle.ibd
+    - Output: inbreeding_rankings.txt
+    *Produces ranked relatedness scores*
+
+---
+
+## Example Output
 .posterior — Local ancestry probabilities per site
 truffle.ibd — IBD segment calls
 inbreeding_rankings.txt — Ranked relatedness metrics
 
-# Troubleshooting
-Sample Name Formatting
-SPORE requires sample IDs without underscores.
-Unexpected LG10 Results
-Verify HMM pulse parameters (-p) match expected admixture history.
-Dependency Issues
-Ensure the Conda environment is active before running any scripts.
+---
 
-#Contributing
+## Troubleshooting
+*Sample Name Formatting*
+    SPORE requires sample IDs without underscores.
+*Unexpected LG10 Results*
+    Verify HMM pulse parameters (-p) match expected admixture history.
+*Dependency Issues*
+    Ensure the Conda environment is active before running any scripts.
+
+---
+
+## Contributing
 Contributions are welcome. Please open an issue to discuss proposed changes or submit a pull request.
 
-#License
+---
+
+## License
 This project is licensed under the MIT License.
 
-Contact
+---
+
+## Contact
 
 Lauren Sabo
-PhD Student, McGrath Lab
+Bioinformatics MS Student, McGrath Lab
 
-Email: [your-email@university.edu
-]
-GitHub: https://github.com/your-username
+Email: lsabo8@gatech.edu
+GitHub: https://github.com/laurengsabo
