@@ -30,7 +30,7 @@ workflow {
     // ── Startup log ───────────────────────────────────────────────────────────────
         log.info """
         ┌─────────────────────────────────────────────────────────┐
-        │           F I N P H A S E R  v1.0.0                    │
+        │           F I N P H A S E R  v1.0.0                     │
         │  Local Ancestry Inference & IBD Detection Pipeline      │
         └─────────────────────────────────────────────────────────┘
         vcf          : ${params.vcf}
@@ -44,7 +44,7 @@ workflow {
     if (params.help) {
         log.info """
         ┌─────────────────────────────────────────────────────────┐
-        │           F I N P H A S E R  v1.0.0                    │
+        │           F I N P H A S E R  v1.0.0                     │
         │  Local Ancestry Inference & IBD Detection Pipeline      │
         └─────────────────────────────────────────────────────────┘
 
