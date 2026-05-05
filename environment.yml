@@ -1,18 +1,25 @@
-name: cichlid-genomics
+name: FinPhaser
 channels:
   - conda-forge
   - bioconda
   - defaults
 dependencies:
-  - python=3.9
-  - nextflow=23.10.1
-  - bwa=0.7.17
-  - gatk4=4.5.0.0
-  - bcftools=1.19
-  - samtools=1.19
-  - scikit-allel=1.3.6
-  - r-base=4.3.1
+  - python=3.12
+  - r-base=3.6.3
+  - ancestry_hmm=1.0.2
+  - selam=0.9
+  - bcftools=1.14
+  - htslib=1.21
+  - gsl=2.7
   - pandas
   - numpy
-  - matplotlib
-  - seaborn
+  - python-dateutil
+  - r-ggplot2
+  - r-dplyr
+  - r-data.table
+  - r-tidyr
+  - r-readr
+  - r-r.utils
+  - pip
+  - pip:
+    - -e .

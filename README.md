@@ -1,45 +1,116 @@
-FinPhaser
-A Reproducible Pipeline for Genomic Inversion Analysis in Cichlids
+# FinPhaser
 
-Overview
-FinPhaser is an automated bioinformatics pipeline designed to analyze the LG10 inversion in Aulonocara (Yellow Head) cichlids. By processing backcrosses with Mchenga conoforos, the pipeline identifies ancestral mosaicism through high-confidence SNP discovery, statistical phasing, and haplotype inference.
+<p align="center">
+  <b>A reproducible framework for local ancestry inference and IBD detection in hybrid populations</b>
+</p>
 
-Repository Structure
-Following the model of high-standard repositories like scikit-learn, FinPhaser is organized as follows:
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.9+-blue.svg" />
+  <img src="https://img.shields.io/badge/R-4.0+-blue.svg" />
+  <img src="https://img.shields.io/badge/conda-environment-green.svg" />
+  <img src="https://img.shields.io/badge/status-active-success.svg" />
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey.svg" />
+</p>
 
-bin/: Contains core analysis scripts, including the scikit-allel phasing script and the SPORE R-script.
+---
 
-config/: Nextflow profiles and software configurations.
+## Overview
 
-data/: Bundled test dataset (subsampled BAMs for LG10) to exercise pipeline features.
+**FinPhaser** is a bioinformatics pipeline for estimating **local ancestry** and **Identity-By-Descent (IBD)** in hybrid populations, with a focus on African cichlid genomics.
 
-docs/: Documentation, including VCF_generation.pdf and the project prospectus.  
+The framework integrates:
+- Variant filtering and phasing
+- Hidden Markov Models for ancestry inference
+- Admixture analysis using SPORE
+- IBD detection and ranking
 
-results/: Automated output directory for VCFs, phased haplotypes, and LOD plots.
+It is particularly suited for studying **complex sex determination systems**, including ZW/XY dynamics on the LG10 linkage group in *Aulonocara* 'Yellow Head'.
 
-Pipeline Workflow
-The pipeline executes the following stages in a single command:
+---
 
-Variant Calling: Implements GATK HaplotypeCaller and GenotypeGVCFs logic to produce a multisample VCF.  
+## Quick Start
 
-Filtration: Standardizes SNP quality by filtering for biallelic sites and depth (DP) thresholds.  
+```bash id="qs1x2a"
+# Clone repository
+git clone https://github.com/your-username/FinPhaser.git
+cd FinPhaser
 
-Statistical Phasing: Uses scikit-allel to resolve long-range haplotypes across the chromosome.
-
-Haplotype Inference: Runs Ancestry_HMM followed by SPORE for ancestral tracking and data visualization.
-
-Getting Started
-1. Environment Setup
-
-Bash
+# Create environment
 conda env create -f environment.yml
-conda activate finphaser_env
-2. Running the Pipeline
-To run the end-to-end analysis on your test data:
+conda activate FinPhaser
 
-Bash
-nextflow run main.nf --input 'data/*.bam' --ref 'data/reference.fasta'
-Validation & Quality Control
-Execution: The workflow is managed via Nextflow for full parallelization and dependency resolution.
+# Run core pipeline (example)
+python src/ancestry/PhaseParents_VCF.py data/raw/YHPedigree1_FilteredSNVs.recode.vcf
+ancestry_hmm -i ancestry_input.txt -s ahmm.ploidy -a 4 0.25 0.25 0.25 0.25
+Rscript src/SPORE.R config/SPORE-Settings.R
 
-Automated Checks: Integrated validation scripts confirm output correctness by checking row counts and checksums against known-result comparisons.
+---
+
+## Features
+- Reproducible pipeline with unified environment
+- Local ancestry inference via HMM
+- IBD detection and ranking
+- Custom SNV filtering and phasing
+- Modular design for easy extension
+
+---
+
+#Repository Structure
+.
+├── config/             # Parameter files (e.g., SPORE-Settings.R)
+├── data/
+│   ├── raw/            # Input VCF files
+│   └── processed/      # Phased and filtered outputs
+├── docs/               # Architecture diagrams and notes
+├── results/            # Final outputs and logs
+├── src/
+│   ├── ancestry/       # Phasing + HMM preprocessing
+│   ├── reporting/      # IBD ranking + summaries
+│   └── SPORE.R         # Admixture analysis
+└── environment.yml     # Conda environment
+
+#Pipeline Workflow
+Phasing
+Input: FilteredSNVs.vcf
+Output: conserved_phased.vcf
+Identifies conserved informative SNVs
+Ancestry Inference (HMM)
+Input: ancestry_input.txt
+Output: .posterior
+Computes local ancestry probabilities
+Admixture Analysis (SPORE)
+Input: Genomics_Sex.tsv
+Output: truffle.ibd
+Detects IBD segments
+IBD Ranking
+Input: truffle.ibd
+Output: inbreeding_rankings.txt
+Produces ranked relatedness scores
+
+# Example Output
+.posterior — Local ancestry probabilities per site
+truffle.ibd — IBD segment calls
+inbreeding_rankings.txt — Ranked relatedness metrics
+
+# Troubleshooting
+Sample Name Formatting
+SPORE requires sample IDs without underscores.
+Unexpected LG10 Results
+Verify HMM pulse parameters (-p) match expected admixture history.
+Dependency Issues
+Ensure the Conda environment is active before running any scripts.
+
+#Contributing
+Contributions are welcome. Please open an issue to discuss proposed changes or submit a pull request.
+
+#License
+This project is licensed under the MIT License.
+
+Contact
+
+Lauren Sabo
+PhD Student, McGrath Lab
+
+Email: [your-email@university.edu
+]
+GitHub: https://github.com/your-username
