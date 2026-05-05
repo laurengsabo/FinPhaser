@@ -1,25 +1,39 @@
 name: FinPhaser
+# ============================================================
+#  FinPhaser Conda Environment
+# ============================================================
+#  All versions are pinned for full reproducibility.
+#  Build:    conda env create -f environment.yml
+#  Activate: conda activate FinPhaser
+# ============================================================
+
 channels:
-  - conda-forge
-  - bioconda
+  - conda-forge   # preferred — most up-to-date packages
+  - bioconda      # ancestry_hmm, bcftools, htslib
   - defaults
+
 dependencies:
+  # ── Core language runtimes ──────────────────────────────────
   - python=3.12
-  - r-base=3.6.3
+  - r-base=4.3.3
+
+  # ── Workflow manager ────────────────────────────────────────
+  - nextflow=24.04.4
+
+  # ── Bioinformatics tools ────────────────────────────────────
   - ancestry_hmm=1.0.2
-  - selam=0.9
-  - bcftools=1.14
+  - bcftools=1.21
   - htslib=1.21
+  - selam=0.9
+
+  # ── C library (ancestry_hmm dependency) ────────────────────
   - gsl=2.7
-  - pandas
-  - numpy
-  - python-dateutil
-  - r-ggplot2
-  - r-dplyr
-  - r-data.table
-  - r-tidyr
-  - r-readr
-  - r-r.utils
-  - pip
-  - pip:
-    - -e .
+
+  # ── Python packages ─────────────────────────────────────────
+  - pandas=2.2.2
+  - numpy=1.26.4
+  - pyyaml=6.0.1          # required by all bin/ helper scripts
+
+  # ── R packages ──────────────────────────────────────────────
+  - r-ggplot2=3.5.1
+  - r-dplyr=1.1.4

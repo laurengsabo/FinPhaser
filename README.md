@@ -32,7 +32,7 @@ It is particularly suited for studying **complex sex determination systems**, in
 
 ```bash id="qs1x2a"
 # Clone repository
-git clone https://github.com/your-username/FinPhaser.git
+git clone https://github.com/laurengsabo/FinPhaser.git
 cd FinPhaser
 
 # Create environment

@@ -1,67 +1,116 @@
-nextflow.enable.dsl=2
+#!/usr/bin/env nextflow
+/*
+ * ============================================================
+ *  FinPhaser — Main Pipeline Entry Point
+ * ============================================================
+ *  Local ancestry inference and IBD detection in hybrid populations.
+ *
+ *  Two inputs required:
+ *    1. A raw filtered VCF  (e.g. YHPedigree1_FilteredSNVs.recode.vcf)
+ *    2. A samples YAML      (e.g. config/samples.yml)
+ *
+ *  Usage:
+ *    nextflow run main.nf -profile conda
+ *    nextflow run main.nf -profile conda \
+ *        --vcf data/raw/YHPedigree1_FilteredSNVs.recode.vcf \
+ *        --samples_yml config/samples.yml
+ * ============================================================
+ */
 
-// Define input parameters
-params.input_bam = "data/*.bam"
-params.reference = "data/reference.fasta"
-params.outdir = "results"
+nextflow.enable.dsl = 2
 
-process VARIANT_CALLING {
-    tag "GATK on $bam"
-    publishDir "${params.outdir}/vcf", mode: 'copy'
+// ── Help message ──────────────────────────────────────────────────────────────
+if (params.help) {
+    log.info """
+    ┌─────────────────────────────────────────────────────────┐
+    │           F I N P H A S E R  v1.0.0                    │
+    │  Local Ancestry Inference & IBD Detection Pipeline      │
+    └─────────────────────────────────────────────────────────┘
 
-    input:
-    path bam
-    path ref
+    USAGE:
+        nextflow run main.nf -profile conda [options]
 
-    output:
-    path "raw_variants.vcf.gz"
+    REQUIRED INPUTS (set in nextflow.config or pass via CLI):
+        --vcf           Path to raw filtered VCF file
+        --samples_yml   Path to sample/population config YAML
 
-    script:
-    """
-    # Logic derived from VCF_generation.pdf
-    gatk HaplotypeCaller -R $ref -I $bam -O raw_variants.vcf.gz
-    bcftools view -v snps -m2 -M2 raw_variants.vcf.gz -Oz -o filtered_biallelic.vcf.gz
-    """
+    OPTIONS:
+        --outdir        Output directory           [default: results/]
+        --help          Show this help message
+
+    PROFILES:
+        conda           Local conda environment    [recommended]
+        mamba           Local mamba (faster solves)
+        docker          Docker container
+        singularity     Singularity container (HPC)
+        test            Run bundled test dataset
+
+    EXAMPLES:
+        # Standard run
+        nextflow run main.nf -profile conda
+
+        # Custom inputs
+        nextflow run main.nf -profile conda \\
+            --vcf data/raw/MyFile.vcf \\
+            --samples_yml config/samples.yml
+
+        # HPC with Singularity
+        nextflow run main.nf -profile singularity
+
+        # Quick test
+        nextflow run main.nf -profile test
+    """.stripIndent()
+    exit 0
 }
 
-process PHASE_VARIANTS {
-    tag "Scikit-Allel Phasing"
-    publishDir "${params.outdir}/phased", mode: 'copy'
+// ── Import subworkflows ───────────────────────────────────────────────────────
+include { ANCESTRY_WORKFLOW } from './workflows/ancestry'
+include { IBD_WORKFLOW       } from './workflows/ibd'
 
-    input:
-    path vcf
+// ── Startup log ───────────────────────────────────────────────────────────────
+log.info """
+┌─────────────────────────────────────────────────────────┐
+│           F I N P H A S E R  v1.0.0                    │
+│  Local Ancestry Inference & IBD Detection Pipeline      │
+└─────────────────────────────────────────────────────────┘
+vcf          : ${params.vcf}
+samples_yml  : ${params.samples_yml}
+outdir       : ${params.outdir}
+profile      : ${workflow.profile}
+──────────────────────────────────────────────────────────
+""".stripIndent()
 
-    output:
-    path "phased_variants.vcf.gz"
-
-    script:
-    """
-    # Runs your custom scikit-allel phasing script
-    python bin/phase_script.py --input $vcf --output phased_variants.vcf.gz
-    """
-}
-
-process ANCESTRY_ANALYSIS {
-    tag "Ancestry_HMM & SPORE"
-    publishDir "${params.outdir}/final", mode: 'copy'
-
-    input:
-    path phased_vcf
-
-    output:
-    path "lod_plots.png"
-    path "spore_results.csv"
-
-    script:
-    """
-    # Ancestry_HMM followed by SPORE R-script
-    Ancestry_HMM -i $phased_vcf -o ancestry_output.txt
-    Rscript bin/spore_analysis.R ancestry_output.txt
-    """
-}
-
+// ── Main workflow ─────────────────────────────────────────────────────────────
 workflow {
-    vcf_ch = VARIANT_CALLING(params.input_bam, params.reference)
-    phased_ch = PHASE_VARIANTS(vcf_ch)
-    ANCESTRY_ANALYSIS(phased_ch)
+
+    // Input channels — both files must exist before the pipeline starts
+    ch_vcf         = Channel.fromPath(params.vcf,         checkIfExists: true)
+    ch_samples_yml = Channel.fromPath(params.samples_yml, checkIfExists: true)
+
+    // Steps 1–5: Phasing → HMM input prep → ancestry_hmm → summary report
+    ANCESTRY_WORKFLOW(ch_vcf, ch_samples_yml)
+
+    // Steps 6–7: SPORE admixture → IBD ranking
+    IBD_WORKFLOW(
+        ANCESTRY_WORKFLOW.out.phased_vcf,
+        ch_samples_yml
+    )
+}
+
+// ── Completion handler ────────────────────────────────────────────────────────
+workflow.onComplete {
+    def status = workflow.success ? "SUCCESS ✔" : "FAILED ✘"
+    log.info """
+    ──────────────────────────────────────────────────────────
+    Pipeline complete!
+    Status   : ${status}
+    Duration : ${workflow.duration}
+    Outputs  : ${params.outdir}/
+    Report   : ${params.tracedir}/execution_report.html
+    ──────────────────────────────────────────────────────────
+    """.stripIndent()
+}
+
+workflow.onError {
+    log.error "Pipeline failed: ${workflow.errorReport}"
 }
