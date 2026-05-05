@@ -10,19 +10,27 @@
  *    Out    : YHPed1_conserved_phased.vcf
  *
  *  Step 2+3 — PREPARE_HMM_INPUT  (combined)
- *    Script : src/ancestry/mod_vcf2ahmm.py --pop-yaml
- *    In     : phased VCF + samples.yml (pop assignments read directly)
+ *    Helper : bin/yaml_to_popinfo.py
+ *      Reads samples.yml → writes mod_popinfo.txt in the exact
+ *      tab-separated format that mod_vcf2ahmm.py expects
+ *      (sample<TAB>pop, one row per haplotype, "admixed" literal).
+ *    Script : src/ancestry/mod_vcf2ahmm.py
+ *      Reads the generated mod_popinfo.txt and the phased VCF.
+ *      All tunable parameters (recombination rate, min distance,
+ *      allele freq diff threshold) are pulled from samples.yml
+ *      and forwarded as CLI flags.
+ *    In     : phased VCF + samples.yml
  *    Out    : ancestry_input.txt, ahmm.ploidy
  *
  *  Step 4 — RUN_ANCESTRY_HMM
  *    Tool   : ancestry_hmm (CLI)
  *    In     : ancestry_input.txt, ahmm.ploidy
- *    Out    : *.posterior files
+ *    Out    : *.posterior files (one per admixed sample)
  *
  *  Step 5 — ANCESTRY_SUMMARY
  *    Script : src/ancestry/SNV_count.py
  *    In     : directory of *.posterior files
- *    Out    : ancestry_summary_report/ directory
+ *    Out    : ancestry_summary_report/
  * ============================================================
  */
 
@@ -33,22 +41,15 @@ nextflow.enable.dsl = 2
 // ─────────────────────────────────────────────────────────────────────────────
 process PHASE_PARENTS {
     tag "PhaseParents"
-
-    // Publish the phased VCF so users can inspect it
     publishDir "${params.outdir}/ancestry/01_phased", mode: 'copy'
 
     input:
-    path vcf            // raw filtered VCF
+    path vcf
 
     output:
     path "YHPed1_conserved_phased.vcf", emit: phased_vcf
 
     script:
-    /*
-     * PhaseParents_VCF.py (modified from Dr. McGrath's PhaseParents_Scikit.py)
-     * Identifies conserved informative SNVs and masks parental genotypes
-     * to produce a phased VCF.
-     */
     """
     python ${projectDir}/src/ancestry/PhaseParents_VCF.py ${vcf}
     """
@@ -59,32 +60,55 @@ process PHASE_PARENTS {
 // ─────────────────────────────────────────────────────────────────────────────
 process PREPARE_HMM_INPUT {
     tag "PrepareHMMInput"
-
     publishDir "${params.outdir}/ancestry/02_hmm_input", mode: 'copy'
 
     input:
-    path phased_vcf     // conserved phased VCF from step 1
-    path samples_yml    // user-supplied YAML with pop assignments
+    path phased_vcf
+    path samples_yml
 
     output:
     path "ancestry_input.txt", emit: ancestry_input
     path "ahmm.ploidy",        emit: ploidy_file
+    path "mod_popinfo.txt",    emit: popinfo       // saved for reproducibility / inspection
 
     script:
     /*
-     * mod_vcf2ahmm.py --pop-yaml reads population assignments (0/1/2/3/-1)
-     * directly from samples.yml, building the internal popinfo structure and
-     * then producing both ancestry_hmm input files in one pass.
+     * Step 2 (combined into one process):
+     *   bin/yaml_to_popinfo.py converts the populations block of
+     *   samples.yml into the tab-separated mod_popinfo.txt that
+     *   mod_vcf2ahmm.py expects:
+     *       YH_006_f<TAB>0
+     *       YH_006_f<TAB>1
+     *       YH_011_m<TAB>2
+     *       YH_011_m<TAB>3
+     *       YH_016<TAB>admixed
+     *       ...
      *
-     * This combines the original ancestry_input.py (step 2) and
-     * mod_vcf2ahmm.py (step 3) into a single invocation.
+     * Step 3:
+     *   mod_vcf2ahmm.py uses its original CLI flags:
+     *     -v  phased VCF
+     *     -s  mod_popinfo.txt (generated above)
+     *     -g  use_genotypes (0 = read counts, 1 = genotypes)
+     *     -r  recombination rate in Morgans/bp
+     *     -m  min distance between SNPs in bp
+     *     --min_diff  min allele frequency difference between haplotypes
      */
     """
-    python ${projectDir}/src/ancestry/mod_vcf2ahmm.py \\
-        --vcf        ${phased_vcf}     \\
-        --pop-yaml   ${samples_yml}    \\
-        --out-input  ancestry_input.txt \\
-        --out-ploidy ahmm.ploidy
+    # Convert samples.yml → mod_popinfo.txt
+    python ${projectDir}/bin/yaml_to_popinfo.py \
+        --samples-yml ${samples_yml} \
+        --out         mod_popinfo.txt
+
+    # Convert phased VCF + popinfo → ancestry_hmm input files
+    python ${projectDir}/src/ancestry/mod_vcf2ahmm.py \
+        -v       ${phased_vcf}      \
+        -s       mod_popinfo.txt    \
+        -o_txt   ancestry_input.txt \
+        -o_ploidy ahmm.ploidy       \
+        -g       ${params.hmm_use_genotypes}     \
+        -r       ${params.hmm_recombination_rate} \
+        -m       ${params.hmm_min_distance_bp}    \
+        --min_diff ${params.hmm_min_allele_freq_diff}
     """
 }
 
@@ -93,10 +117,8 @@ process PREPARE_HMM_INPUT {
 // ─────────────────────────────────────────────────────────────────────────────
 process RUN_ANCESTRY_HMM {
     tag "AncestryHMM"
-
     publishDir "${params.outdir}/ancestry/03_posteriors", mode: 'copy'
 
-    // Give this process more CPUs and memory — it is the most compute-heavy step
     cpus   4
     memory '16 GB'
     time   '6 h'
@@ -106,26 +128,27 @@ process RUN_ANCESTRY_HMM {
     path ploidy_file
 
     output:
-    // Capture every .posterior file produced (one per admixed sample)
     path "*.posterior", emit: posterior_files
 
     script:
     /*
-     * ancestry_hmm parameters:
-     *   -a 4 0.25 0.25 0.25 0.25  — 4 ancestral populations, equal priors
-     *   -p 0..3 -2 0.25           — each pulse ~2 generations ago, equal weight
-     *
-     * These defaults come from the samples.yml [hmm] block; override them
-     * there rather than editing this file.
+     * 4-population model:
+     *   -a 4 0.25 0.25 0.25 0.25
+     *       Four ancestral haplotypes; equal prior on each.
+     *   -p 0..3  -2  0.25
+     *       Each haplotype pulse placed ~2 generations back with
+     *       equal initial proportion. The negative sign for
+     *       generations is ancestry_hmm convention for discrete
+     *       admixture pulses (not continuous migration).
      */
     """
-    ancestry_hmm \\
-        -i ${ancestry_input} \\
-        -s ${ploidy_file}    \\
-        -a 4 0.25 0.25 0.25 0.25 \\
-        -p 0 -2 0.25 \\
-        -p 1 -2 0.25 \\
-        -p 2 -2 0.25 \\
+    ancestry_hmm \
+        -i ${ancestry_input} \
+        -s ${ploidy_file}    \
+        -a 4 0.25 0.25 0.25 0.25 \
+        -p 0 -2 0.25 \
+        -p 1 -2 0.25 \
+        -p 2 -2 0.25 \
         -p 3 -2 0.25
     """
 }
@@ -135,57 +158,45 @@ process RUN_ANCESTRY_HMM {
 // ─────────────────────────────────────────────────────────────────────────────
 process ANCESTRY_SUMMARY {
     tag "AncestrySummary"
-
     publishDir "${params.outdir}/ancestry", mode: 'copy'
 
     input:
-    // .collect() gathers all individual .posterior paths into one list,
-    // staging them all into the same working directory before the script runs.
-    path posterior_files
+    path posterior_files    // .collect() gathers all into one staging dir
 
     output:
     path "ancestry_summary_report/", emit: summary_dir
 
     script:
-    /*
-     * SNV_count.py reads every .posterior file in the current working directory
-     * and writes per-sample calls_<sample>.csv files plus a master summary CSV.
-     */
     """
     mkdir -p ancestry_summary_report
-    python ${projectDir}/src/ancestry/SNV_count.py \\
-        --input-dir  . \\
+    python ${projectDir}/src/ancestry/SNV_count.py \
+        --input-dir  . \
         --output-dir ancestry_summary_report
     """
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  SUBWORKFLOW: ANCESTRY_WORKFLOW
+//  SUBWORKFLOW
 // ─────────────────────────────────────────────────────────────────────────────
 workflow ANCESTRY_WORKFLOW {
 
     take:
-    ch_vcf          // Channel<Path> — raw VCF
-    ch_samples_yml  // Channel<Path> — user YAML
+    ch_vcf
+    ch_samples_yml
 
     main:
-
-    // Step 1
     PHASE_PARENTS(ch_vcf)
 
-    // Steps 2 + 3
     PREPARE_HMM_INPUT(
         PHASE_PARENTS.out.phased_vcf,
         ch_samples_yml
     )
 
-    // Step 4
     RUN_ANCESTRY_HMM(
         PREPARE_HMM_INPUT.out.ancestry_input,
         PREPARE_HMM_INPUT.out.ploidy_file
     )
 
-    // Step 5 — collect all .posterior files before passing to summary
     ANCESTRY_SUMMARY(
         RUN_ANCESTRY_HMM.out.posterior_files.collect()
     )
