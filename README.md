@@ -3,8 +3,8 @@
   <b>A reproducible framework for local ancestry inference and IBD detection in hybrid populations</b>
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.12-blue.svg" />
-  <img src="https://img.shields.io/badge/R-4.3+-blue.svg" />
+  <img src="https://img.shields.io/badge/python-3.10-blue.svg" />
+  <img src="https://img.shields.io/badge/R-multi--version-blue.svg" />
   <img src="https://img.shields.io/badge/nextflow-24.04-brightgreen.svg" />
   <img src="https://img.shields.io/badge/conda-environment-green.svg" />
   <img src="https://img.shields.io/badge/status-active-success.svg" />
@@ -67,48 +67,27 @@ cd FinPhaser
 # Your starting VCF — the only genomic input needed
 mkdir -p data/raw
 cp /path/to/YHPedigree1_FilteredSNVs.recode.vcf data/raw/
-
-# TRUFFLE binary (standalone executable — not available via conda)
-mkdir -p tools/truffle
-cp /path/to/truffle/truffle      tools/truffle/truffle
-cp /path/to/truffle/LICENSE.txt  tools/truffle/LICENSE.txt
-chmod +x tools/truffle/truffle
 ```
 
 ---
 
-### 3. Place your analysis scripts
+### 3. Build conda environments
 
-```bash
-# SPORE R scripts (copy from your SPORE installation)
-mkdir -p src/spore/scripts
-cp /path/to/SPORE/SPORE.R            src/spore/SPORE.R
-cp /path/to/SPORE/scripts/Mendel1.R  src/spore/scripts/Mendel1.R
+FinPhaser uses **process-specific Conda environments** for full reproducibility.
 
-# Python analysis scripts
-mkdir -p src/ancestry src/reporting
-cp /path/to/PhaseParents_VCF.py  src/ancestry/
-cp /path/to/mod_vcf2ahmm.py      src/ancestry/
-cp /path/to/SNV_count.py         src/ancestry/
-cp /path/to/rank_ibd.py          src/reporting/
-```
+- `envs/finphaser.yml` — modern Python + bioinformatics tools
+- `envs/spore.yml` — legacy R environment required by SPORE
 
-> `Mendel1.R` must be at `src/spore/scripts/Mendel1.R` — `SPORE.R` sources it relative to its own location.
+You **do not need to manually create or activate environments**.
+
+Nextflow will automatically:
+- create environments as needed
+- activate the correct environment per step
+- cache them for reuse
 
 ---
 
-### 4. Build the conda environment
-
-```bash
-conda env create -f environment.yml
-conda activate FinPhaser
-```
-
-> **Faster alternative:** use `mamba env create` or run with `-profile mamba`.
-
----
-
-### 5. Configure your samples
+### 4. Configure your samples
 
 All pipeline configuration lives in `config/samples.yml`. The two things to set for your data:
 
@@ -148,13 +127,13 @@ Sex metadata (`Genomics_Sex.tsv`) is **generated automatically** at runtime from
 
 ---
 
-### 6. Run the pipeline
+### 5. Run the pipeline
 
 ```bash
 nextflow run main.nf -profile conda
 ```
 
-That's it. Nextflow manages every step automatically.
+Nextflow will automatically handle all software dependencies using Conda.
 
 **Resume after a failure** (completed steps are not re-run):
 ```bash
@@ -177,6 +156,16 @@ nextflow run main.nf -profile test
 | `docker` | Docker container (build image first — see below) |
 | `singularity` | Singularity container — best for HPC clusters |
 | `test` | Runs bundled test dataset; completes in minutes |
+
+## Reproducibility
+
+FinPhaser uses **process-level environment isolation** via Nextflow:
+
+- Each pipeline step runs in its own Conda environment
+- Legacy tools (e.g., SPORE with R 3.6) are isolated from modern dependencies
+- All environments are fully version-pinned in `envs/`
+
+This design avoids dependency conflicts and ensures consistent results across systems.
 
 ### Docker
 
@@ -385,7 +374,9 @@ results/
 │   │   └── YHPedigree1_FilteredSNVs.recode.vcf   # Starting VCF (only genomic input)
 │   └── test/                       # Bundled test dataset
 ├── docs/                           # Architecture diagrams and notes
-├── environment.yml                 # Pinned conda environment
+├── envs/
+│   ├── finphaser.yml               # finphaser conda init
+│   └── spore.yml                   # spore conda init
 ├── main.nf                         # Pipeline entry point
 ├── nextflow.config                 # Profiles, resource limits, reporting
 ├── src/
