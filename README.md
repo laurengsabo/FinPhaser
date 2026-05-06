@@ -15,7 +15,7 @@
 ---
 
 <p align="center">
-  <img src="docs/figures/finphaser.png" width="600" alt="FinPhaser Pipeline Overview"/>
+  <img src="docs/figures/finphaser.png" width="400" alt="FinPhaser Pipeline Overview"/>
 </p>
 
 ---
