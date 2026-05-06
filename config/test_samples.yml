@@ -15,7 +15,7 @@
 # ============================================================
 
 # ── Input VCF ────────────────────────────────────────────────
-vcf: "data/test/test_FilteredSNVs.recode.vcf"
+vcf: "data/test/test_FilteredSNVs.recode.vcf.gz"
 
 # ── Chromosome → linkage group mapping ───────────────────────
 linkage_groups:
@@ -50,7 +50,7 @@ hmm:
 
 # ── SPORE / TRUFFLE settings ──────────────────────────────────
 spore:
-  truffle_path: "tools/truffle/truffle"
+  truffle_path: "/storage/ice1/0/6/lsabo8/FinPhaser/tools/truffle/truffle"
   truffle_maf: 0.05
   truffle_missing: 0.95
   APO: 24

@@ -116,7 +116,7 @@ process RUN_SPORE {
     path samples_yml     // for reading the full spore: block
 
     output:
-    path "*-truffle.ibd",    emit: ibd_file          // main IBD output
+    path "*-truffle.ibd*",   emit: ibd_file          // .ibd or .ibd.iqr.gz
     path "*",                emit: all_outputs        // all SPORE outputs
     path "SPORE_output.log", emit: spore_log
     path "SPORE-Settings.R", emit: spore_settings     // saved for reproducibility

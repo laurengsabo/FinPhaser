@@ -75,7 +75,11 @@ def phase_and_filter_vcf(input_path, output_path, linkage_groups):
     # 3. WRITE THE NEW VCF
     print(f"[PhaseParents_VCF] Writing phased and filtered data to {output_path}...")
     written = 0
-    with open(input_path, 'r') as infile, open(output_path, 'w') as outfile:
+    # Open input as gzip if .gz, otherwise plain text
+    import gzip as _gzip
+    opener = _gzip.open(input_path, 'rt') if input_path.endswith('.gz') else open(input_path, 'r')
+
+    with opener as infile, open(output_path, 'w') as outfile:
         data_row_count = 0
 
         for line in infile:

@@ -13,7 +13,7 @@ KAISER_folder=this.dir()
 homozygous_mendel_script=paste(KAISER_folder,"/scripts/Mendel1.R",sep="")
 previously_computed_three_thresholds=FALSE
 
-NoTrioCalculation=FALSE
+NoTrioCalculation=TRUE
 AimPopFractionAPO=1
 LowTrioMode=FALSE
 

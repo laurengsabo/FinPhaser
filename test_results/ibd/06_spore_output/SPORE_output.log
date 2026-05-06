@@ -1,0 +1,160 @@
+[1] "SPORE 2.1.4"
+[1] "Web: https://github.com/jnrunge/SPORE"
+[1] "SPORE-Settings.R"
+Loading required package: this.path
+[1] "LowTrioMode = FALSE"
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: ‘data.table’
+
+The following objects are masked from ‘package:dplyr’:
+
+    between, first, last
+
+
+Attaching package: ‘MASS’
+
+The following object is masked from ‘package:dplyr’:
+
+    select
+
+character(0)
+[1] "/storage/ice1/0/6/lsabo8/FinPhaser/work/ca/283fef490742782ad67b84c2bd8e70/"
+[1] "YHPed1_conserved_phased.vcf.gz"
+[1] "APO=24"
+[1] "Finding unique chromosomes in VCF."
+[1] "Running TRUFFLE."
+[1] "Start"                           "Wed May  6 06:53:48 AM EDT 2026"
+write: Bad file descriptor
+ [1] ""                                                                                             
+ [2] "     _               __  __ _       "                                                         
+ [3] "    | |             / _|/ _| |      "                                                         
+ [4] "    | |_ _ __ _   _| |_| |_| | ___  "                                                         
+ [5] "    | __| '__| | | |  _|  _| |/ _ \\ "                                                        
+ [6] "    | |_| |  | |_| | | | | | |  __/ "                                                         
+ [7] "     \\__|_|   \\__,_|_| |_| |_|\\___| "                                                      
+ [8] "        "                                                                                     
+ [9] "         - TRUFFLE v1.38 -    "                                                               
+[10] ""                                                                                             
+[11] ""                                                                                             
+[12] ""                                                                                             
+[13] "***"                                                                                          
+[14] "*** Non-commerical and educational use license."                                              
+[15] "***"                                                                                          
+[16] ""                                                                                             
+[17] ""                                                                                             
+[18] "[*]  Options in effect: "                                                                     
+[19] "      -   Input file: YHPed1_conserved_phased.vcf.gz"                                         
+[20] "      -   Number of CPUs: 4"                                                                  
+[21] ""                                                                                             
+[22] "      -   Reporting threshold: all pairs"                                                     
+[23] ""                                                                                             
+[24] "      -   Segment reporting: NO"                                                              
+[25] ""                                                                                             
+[26] "      -   Input file name: YHPed1_conserved_phased.vcf.gz"                                    
+[27] "      -   Opening output file YHPed1_conserved_phased.vcf.gz-truffle.ibd  "                   
+[28] "      -   Number of samples: 26"                                                              
+[29] ""                                                                                             
+[30] "      -   Allocation genotype vector  npeople=42 nvars=200000"                                
+[31] "      -   GenotypeMatrix: allocating 8 MB of memory"                                          
+[32] "      -   Excluding variants with missing rate > 0.950 (25 samples)"                          
+[33] ""                                                                                             
+[34] "      -   Excluding variants with allele frequency  < 0.050"                                  
+[35] ""                                                                                             
+[36] "      -   Reading chromosome LG1 (pos=0)"                                                     
+[37] "      -   Chromosome   LG1    Markers    22752    Cumulative    22752"                        
+[38] ""                                                                                             
+[39] "[*]  Finished reading input files:  396.72 ms "                                               
+[40] ""                                                                                             
+[41] "      -   Expected IBS for unrelated pairs: p.IBS0 = 0.0927  p.IBS1 = 0.4792  p.IBS2 = 0.4280"
+[42] "      -   X-chromosome: pIBS2(X/X) = 0.5749 pIBS2(X/XX) = 0.2125   Mean MAF = 0.3286"         
+[43] "      -   (ibs_est)   340 p=0.907277 perr=0.000000"                                           
+[44] "      -   (ibs_est)    39 p=0.428050 perr=0.000000"                                           
+[45] "      -   (ibs_est)  X_X    39 p=0.425059 perr=0.000000"                                      
+[46] "      -   (ibs_est)  X_X   139 p=0.787470 perr=0.000000"                                      
+[47] "      -   (ibs_est) Thresholds for defining regions as IBD1 = 340, IBD2 = 39"                 
+[48] "      -   (ibs_est) Inflation at edges IBS1 = 19.6, IBS2 = 2.7"                               
+[49] "      -   Genome size: 17946.409 kb"                                                          
+[50] "      -   gs_threshold=13876.718210"                                                          
+[51] "      -   (ibs_est) Adjust segment size to 13876 markers (from 340)"                          
+[52] "      -   IBS1 threshold : 60.99 % of genome  (13876 markers) "                               
+[53] "      -   IBS2 threshold : 10.16 % of genome  (2312 markers) "                                
+[54] ""                                                                                             
+[55] ""                                                                                             
+[56] ""                                                                                             
+[57] "[*]  Starting IBD segment analysis"                                                           
+[58] ""                                                                                             
+[59] "[*]  Estimated heterozygosity rate = 0.42506 "                                                
+[60] ""                                                                                             
+[61] "      -   Allocation genotype vector transposed npeople=27 nvars=22753"                       
+[62] "      -   GenotypeMatrixTransposed: allocating 0 MB of memory"                                
+[63] ""                                                                                             
+[64] "[*]  Reading sex information file: (null)"                                                    
+[65] "      -   No sex file specified"                                                              
+[66] "      -   Warning: Sample YH_006_f has no available sex information."                         
+[67] "      -   Warning: Sample YH_011_m has no available sex information."                         
+[68] "      -   Warning: Sample YH_016 has no available sex information."                           
+[69] "      -   Warning: 26 samples have no sex information."                                       
+[70] ""                                                                                             
+[71] ""                                                                                             
+[72] "[*]  Genotype pre-processing duration:  399.62 ms "                                           
+[73] ""                                                                                             
+[74] " -  Compute IBD by IBS: (cpu=1/4) Nind = 26 Nvar = 22753"                                     
+[75] " -  Compute IBD by IBS: (cpu=2/4) Nind = 26 Nvar = 22753"                                     
+[76] " -  Compute IBD by IBS: (cpu=3/4) Nind = 26 Nvar = 22753"                                     
+[77] " -  Compute IBD by IBS: (cpu=4/4) Nind = 26 Nvar = 22753"                                     
+[78] ""                                                                                             
+[79] "[*] Finished processing "                                                                     
+[80] ""                                                                                             
+[81] "      -   Total time for analysis was 0.01 minutes (0.5 seconds)"                             
+[82] ""                                                                                             
+[1] "/storage/ice1/0/6/lsabo8/FinPhaser/tools/truffle/truffle --vcf YHPed1_conserved_phased.vcf.gz --cpu 4 --maf 0.05 --missing 0.95 --out YHPed1_conserved_phased.vcf.gz-truffle; gzip -f YHPed1_conserved_phased.vcf.gz-truffle.ibd"
+[1] "Stop"                            "Wed May  6 06:53:49 AM EDT 2026"
+[1] "Find unique individuals in VCF."
+character(0)
+        V1
+1 YH_006_f
+2 YH_011_m
+3   YH_016
+4   YH_017
+5   YH_018
+6   YH_019
+NULL
+[1] "Saving progress."
+character(0)
+[1] "Calculating thresholds."
+[1] "Start"                           "Wed May  6 06:53:50 AM EDT 2026"
+[1] "Thresholding IBD0:"
+[1] 1
+[1] 1
+[1] "Stop"                            "Wed May  6 06:53:51 AM EDT 2026"
+[1] "Classiying relationships."
+NA's 
+ 325 
+[1] "Saving progress."
+character(0)
+[1] "Reading sex file."
+[1] "Finding duplicate samples."
+[1] "Outputting pedigree and remaining undirected POs."
+[1] "Saving progress."
+character(0)
+character(0)
+character(0)
+character(0)
+character(0)
+character(0)
+character(0)
+character(0)
+character(0)
+character(0)
+[1] "Done."
