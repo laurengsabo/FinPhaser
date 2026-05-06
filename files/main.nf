@@ -25,6 +25,9 @@ include { IBD_WORKFLOW       } from './workflows/ibd'
 workflow {
 
     // ── Read VCF path from samples.yml ───────────────────────────────────────
+    // The vcf: key in samples.yml is the single source of truth for the input
+    // file. This means the full run is reproducible from samples.yml alone —
+    // no CLI flags or config edits needed when switching VCF files.
     def yml_text  = new File(params.samples_yml).text
     def vcf_match = yml_text =~ /(?m)^vcf:\s*["']?([^"'\s#\r\n]+)["']?/
     if (!vcf_match) {
@@ -36,7 +39,7 @@ workflow {
     // ── Startup log ──────────────────────────────────────────────────────────
     log.info """
     ┌─────────────────────────────────────────────────────────┐
-    │           F I N P H A S E R  v1.0.0                    │
+    │           F I N P H A S E R  v1.0.0                     │
     │  Local Ancestry Inference & IBD Detection Pipeline      │
     └─────────────────────────────────────────────────────────┘
     vcf          : ${vcf_path}  (from samples.yml)
@@ -77,7 +80,7 @@ workflow {
     )
 
     // ── Completion handler ────────────────────────────────────────────────────
-    // Null-safe — required for Nextflow 26+ when workflow aborts mid-run
+    // Null-safe checks required for Nextflow 26+ when workflow aborts
     workflow.onComplete {
         def success  = workflow.success  ?: false
         def duration = workflow.duration ?: "unknown"

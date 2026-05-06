@@ -2,15 +2,27 @@
 """
 bin/yaml_to_sex_tsv.py
 =======================
-Generates Genomics_Sex.tsv for SPORE from the sex fields in samples.yml.
+Generates the Genomics_Sex.tsv file that SPORE needs from the sex
+fields embedded in samples.yml.
 
-Sample names are written with underscores preserved to match VCF column
-headers exactly. SPORE matches these names against the VCF — stripping
-underscores causes mismatches.
+Output format (matches original Genomics_Sex.tsv exactly):
+    indv<TAB>GenomicsSex
+    YH_011_m<TAB>M
+    YH_006_f<TAB>F
+    YH_016<TAB>F
+    ...
+
+IMPORTANT: Sample names are written exactly as they appear in samples.yml,
+with underscores preserved. SPORE matches these names against the VCF
+sample names, which also contain underscores — stripping them causes
+mismatches and breaks the sex-based analysis.
+
+Each unique sample is written ONCE (parents appear twice in the
+populations block for haplotype tracking, but only once in the TSV).
 
 Uses only stdlib — no pyyaml dependency.
 
-Usage (called automatically by Nextflow):
+Usage (called automatically by Nextflow — not normally run directly):
     python bin/yaml_to_sex_tsv.py \\
         --samples-yml config/samples.yml \\
         --out         Genomics_Sex.tsv
@@ -22,6 +34,10 @@ from pathlib import Path
 
 
 def parse_populations(yml_path: Path) -> list:
+    """
+    Parse the populations block from samples.yml.
+    Returns a list of dicts with at least 'sample', 'population', and 'sex'.
+    """
     text = yml_path.read_text()
     populations = []
     in_populations = False
@@ -64,6 +80,7 @@ def parse_populations(yml_path: Path) -> list:
         # Block style — continuation
         if populations and ":" in line and not line.startswith("-"):
             k, v = line.split(":", 1)
+            # Strip inline comments
             v_clean = v.split("#")[0].strip().strip('"').strip("'")
             populations[-1][k.strip()] = v_clean
 
@@ -74,8 +91,8 @@ def parse_args():
     p = argparse.ArgumentParser(
         description="Generate Genomics_Sex.tsv for SPORE from samples.yml"
     )
-    p.add_argument("--samples-yml", required=True)
-    p.add_argument("--out", default="Genomics_Sex.tsv")
+    p.add_argument("--samples-yml", required=True, help="Path to samples.yml")
+    p.add_argument("--out", default="Genomics_Sex.tsv", help="Output TSV file")
     return p.parse_args()
 
 
@@ -91,7 +108,8 @@ def main():
     if not populations:
         sys.exit("ERROR: No entries found under 'populations:' in samples.yml.")
 
-    # Deduplicate by sample — parents appear twice (once per haplotype)
+    # Deduplicate by sample name — parents appear twice in populations
+    # (once per haplotype) but should appear only once in the sex TSV.
     seen = {}
     for entry in populations:
         sample = entry.get("sample", "")
@@ -101,25 +119,30 @@ def main():
         if sample not in seen:
             if not sex:
                 print(
-                    f"[yaml_to_sex_tsv] WARNING: no sex for {sample} — omitting",
+                    f"[yaml_to_sex_tsv] WARNING: no sex specified for {sample} — "
+                    f"omitting from TSV",
                     file=sys.stderr,
                 )
                 continue
             seen[sample] = sex
         elif seen[sample] != sex:
             sys.exit(
-                f"ERROR: conflicting sex for '{sample}': "
-                f"'{seen[sample]}' vs '{sex}'"
+                f"ERROR: conflicting sex values for sample '{sample}': "
+                f"'{seen[sample]}' vs '{sex}'. Check samples.yml."
             )
 
-    # Write TSV — underscores preserved to match VCF sample names
+    # Write TSV — preserve sample names exactly as in samples.yml
+    # (underscores kept — SPORE matches against VCF names which also have underscores)
     out_path = Path(args.out)
     with open(out_path, "w") as fh:
         fh.write("indv\tGenomicsSex\n")
         for sample, sex in seen.items():
             fh.write(f"{sample}\t{sex}\n")
 
-    print(f"[yaml_to_sex_tsv] Wrote {len(seen)} samples to {out_path}")
+    print(
+        f"[yaml_to_sex_tsv] Wrote {len(seen)} samples to {out_path} "
+        f"(sample names preserved with underscores)"
+    )
 
 
 if __name__ == "__main__":

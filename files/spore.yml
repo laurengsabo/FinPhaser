@@ -2,11 +2,13 @@ name: spore
 # ============================================================
 #  SPORE Conda Environment
 # ============================================================
-#  Upgraded to R 4.3.3 so all packages install from conda-forge
-#  without requiring manual CRAN installs at runtime.
+#  Upgraded from R 3.6.3 to R 4.3.3 so all packages can be
+#  installed from conda-forge rather than requiring manual
+#  CRAN installs at runtime.
 #
 #  Build:    conda env create -f envs/spore.yml
 #  Activate: conda activate spore
+#  Update:   conda env update -f envs/spore.yml --prune
 # ============================================================
 
 channels:
@@ -32,6 +34,8 @@ dependencies:
   - r-r.utils=2.12.3
   - r-sys=3.4.2
   - r-mass=7.3_60
+
+  # ── R packages required by this.path (SPORE dependency) ─────
   - r-this.path=2.3.1
 
   # ── Bioinformatics tools (used by SPORE internally) ─────────
