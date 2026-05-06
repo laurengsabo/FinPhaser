@@ -71,7 +71,8 @@ The TRUFFLE binary (`tools/truffle/truffle`) is compiled for Linux x86-64 and **
 ```bash
 # Option A — direct install
 curl -s https://get.nextflow.io | bash
-sudo mv nextflow /usr/local/bin/
+mkdir -p ~/bin && mv nextflow ~/bin/
+export PATH=$HOME/bin:$PATH
 
 # Option B — via conda
 conda install -c conda-forge nextflow
@@ -81,7 +82,7 @@ conda install -c conda-forge nextflow
 
 ### Option A — Quick test (recommended first run)
 
-No input files needed — everything is bundled. Expected runtime: **15–30 minutes on Linux**.
+No input files needed — everything is bundled. Expected runtime: **30–60 minutes on Linux**.
 
 ```bash
 # 1. Clone the repository
@@ -146,11 +147,13 @@ populations:
   - { sample: "YH_016", population: admixed, sex: F }
 ```
 
-**c) TRUFFLE path:**
+**c) TRUFFLE path** — use the absolute path to the binary on your system:
 ```yaml
 spore:
-  truffle_path: "tools/truffle/truffle"
+  truffle_path: "/absolute/path/to/FinPhaser/tools/truffle/truffle"
 ```
+
+> **Note:** Relative paths for `truffle_path` resolve to the Nextflow process working directory, not the repo root. Always use an absolute path. Run `realpath tools/truffle/truffle` from the repo root to get the correct path.
 
 #### 5. Run the pipeline
 
@@ -171,7 +174,7 @@ nextflow run main.nf -profile conda -resume
 |---------|-------------|
 | `conda` | Per-process conda environments — recommended default |
 | `mamba` | Same as conda but uses mamba for faster environment solves |
-| `test` | Runs bundled 50k-SNP test dataset; completes in ~15–30 min on Linux |
+| `test` | Runs bundled 50k-SNP test dataset; completes in ~30–60 min on Linux |
 
 ## Reproducibility
 
@@ -207,7 +210,7 @@ YHPedigree1_FilteredSNVs.recode.vcf.gz
  AHMM branch      IBD branch
      │                │
      ▼                ▼
-┌─────────────────┐  ┌────────────────────────-──┐
+┌─────────────────┐  ┌──────────────────────────┐
 │  Steps 2+3      │  │  Step 6a — COMPRESS_VCF   │
 │  PREPARE_HMM    │  │  bgzip + CSI index        │
 │  INPUT          │  │                           │
@@ -217,10 +220,10 @@ YHPedigree1_FilteredSNVs.recode.vcf.gz
 │  → mod_         │  └──────────┬────────────────┘
 │    popinfo.txt  │             │
 │                 │             ▼
-│  mod_vcf2ahmm   │  ┌───────────────────────-───┐
+│  mod_vcf2ahmm   │  ┌──────────────────────────┐
 │  .py (-s flag)  │  │  Step 6c — RUN_SPORE      │
 │  → ancestry_    │  │  SPORE.R + TRUFFLE        │
-│    input.txt    │  │  → *-truffle.ibd          │
+│    input.txt    │  │  → *-truffle.ibd.iqr.gz   │
 │  → ahmm.ploidy  │  └──────────┬────────────────┘
 └──────┬──────────┘             │
        │                        ▼
@@ -247,6 +250,7 @@ YHPedigree1_FilteredSNVs.recode.vcf.gz
 - The chromosome → linkage group mapping lives in `samples.yml` under `linkage_groups:` and is extracted at runtime by `bin/yaml_to_linkage_map.py`. Edit there to support a different reference assembly.
 - Sex metadata is generated at runtime by `bin/yaml_to_sex_tsv.py` from the `sex` field in `samples.yml`. Sample names are written **with underscores preserved** to match VCF column headers exactly.
 - `SPORE-Settings.R` is fully auto-generated from `samples.yml` — no manual editing required.
+- `NoTrioCalculation` is set to `TRUE` in `SPORE.R` — Mendelian trio errors require a known pedigree which is not available in this pipeline.
 
 ---
 
@@ -262,10 +266,10 @@ The bundled test dataset lives in `data/test/` and is used by `-profile test`.
 **Expected test run outputs** (in `test_results/`):
 - 24 `.posterior` files (one per admixed sample, YH_016–YH_042)
 - `master_ancestry_summary.csv` with ancestry state calls
-- `*-truffle.ibd` IBD segment calls
+- `*-truffle.ibd.iqr.gz` IBD segment calls (compressed by SPORE)
 - `inbreeding_rankings.txt` with ranked relatedness scores
 
-**Expected runtime:** 15–30 minutes on a Linux server with 8 cores and 16 GB RAM.
+**Expected runtime:** 30–60 minutes on a Linux server with 8 cores and 16 GB RAM (verified: 50 minutes on Georgia Tech ICE cluster).
 
 ---
 
@@ -300,7 +304,7 @@ hmm:
 
 # ── SPORE / TRUFFLE settings ───────────────────────────────────
 spore:
-  truffle_path: "tools/truffle/truffle"
+  truffle_path: "/absolute/path/to/tools/truffle/truffle"
   truffle_maf: 0.05
   truffle_missing: 0.95
   APO: 24
@@ -366,7 +370,8 @@ results/
 │   │   ├── YHPed1_conserved_phased.vcf.gz.csi
 │   │   └── Genomics_Sex.tsv
 │   ├── 06_spore_output/
-│   │   ├── YHPed1_conserved_phased.vcf.gz-truffle.ibd
+│   │   ├── YHPed1_conserved_phased.vcf.gz-truffle.ibd.iqr.gz
+│   │   ├── YHPed1_conserved_phased.vcf.gz--IBD0_threshold.txt
 │   │   ├── SPORE_output.log
 │   │   └── SPORE-Settings.R
 │   └── 07_rankings/
@@ -378,6 +383,15 @@ results/
     ├── execution_trace.txt
     └── pipeline_dag.html
 ```
+
+| File | Description |
+|------|-------------|
+| `*.posterior` | Local ancestry probabilities per genomic site, per sample |
+| `master_ancestry_summary.csv` | Aggregated ancestry calls across all samples |
+| `*-truffle.ibd.iqr.gz` | IBD segment calls from SPORE/TRUFFLE (compressed) |
+| `inbreeding_rankings.tsv` | Ranked relatedness scores (TSV for downstream plotting) |
+| `SPORE-Settings.R` | Auto-generated settings file — saved for reproducibility |
+| `execution_report.html` | Nextflow HTML report — runtime, resource usage, per-step logs |
 
 ---
 
@@ -400,7 +414,7 @@ results/
 │   └── test/
 │       └── test_FilteredSNVs.recode.vcf.gz                  # Bundled test VCF (13 MB)
 ├── docs/
-│   └── figures/                    # ← place pipeline figures here for README
+│   └── figures/                    # Pipeline figures for README
 ├── envs/
 │   ├── finphaser.yml               # Python + ancestry_hmm + bcftools
 │   └── spore.yml                   # R 4.3.3 + SPORE dependencies
@@ -408,13 +422,13 @@ results/
 ├── nextflow.config                 # Profiles, per-process env assignments, resource limits
 ├── src/
 │   ├── ancestry/
-│   │   ├── PhaseParents_VCF.py     # Step 1 — phase parental genotypes
+│   │   ├── PhaseParents_VCF.py     # Step 1 — phase parental genotypes (.vcf and .vcf.gz)
 │   │   ├── mod_vcf2ahmm.py         # Step 3 — convert phased VCF to ancestry_hmm format
 │   │   └── SNV_count.py            # Step 5 — summarise posterior probability files
 │   ├── reporting/
 │   │   └── rank_ibd.py             # Step 7 — rank IBD segments by relatedness
 │   └── spore/
-│       ├── SPORE.R                 # Step 6 — IBD detection
+│       ├── SPORE.R                 # Step 6 — IBD detection (NoTrioCalculation=TRUE)
 │       ├── scripts/
 │       │   └── Mendel1.R           # Sourced internally by SPORE.R
 │       ├── LICENSE
@@ -434,7 +448,19 @@ results/
 ## Troubleshooting
 
 **TRUFFLE cannot run on macOS**
-The `tools/truffle/truffle` binary is compiled for Linux x86-64. It will not run on macOS ARM (Apple Silicon) or macOS Intel. Run the full pipeline on a Linux server or HPC cluster. The ancestry_hmm steps can run on Mac but the SPORE/TRUFFLE step requires Linux.
+The `tools/truffle/truffle` binary is compiled for Linux x86-64. It will not run on macOS ARM (Apple Silicon) or macOS Intel. Run the full pipeline on a Linux server or HPC cluster.
+
+**TRUFFLE binary not found at runtime**
+SPORE resolves `truffle_path` relative to the Nextflow process working directory, not the repo root. Always use an absolute path in `config/samples.yml` or `config/test_samples.yml`:
+```bash
+# Get the absolute path from the repo root
+realpath tools/truffle/truffle
+```
+Then set that value in your config:
+```yaml
+spore:
+  truffle_path: "/absolute/path/to/FinPhaser/tools/truffle/truffle"
+```
 
 **`import allel` error**
 `PhaseParents_VCF.py` requires `scikit-allel`, pinned in `envs/finphaser.yml`. Ensure Nextflow is using `-profile conda` so the correct per-process environment is activated.
@@ -445,7 +471,7 @@ chmod +x tools/truffle/truffle
 ```
 
 **Sample name matching in SPORE**
-Sample names in `Genomics_Sex.tsv` are written exactly as they appear in `samples.yml`, with underscores preserved. This is required for SPORE to match names against the VCF column headers. Do not rename samples in your VCF or `samples.yml`.
+Sample names in `Genomics_Sex.tsv` are written exactly as they appear in `samples.yml`, with underscores preserved. This is required for SPORE to match names against VCF column headers.
 
 **Switching to a different VCF**
 Edit the `vcf:` key in `config/samples.yml`:
@@ -456,6 +482,13 @@ No other files need to be changed.
 
 **ancestry_hmm is slow**
 ancestry_hmm is single-threaded and scales with sites × admixed samples. On a Mac with limited RAM it can take 2+ hours even on a quarter VCF. On a Linux server with 16+ GB RAM, the same run completes in 20–40 minutes. Use `-profile test` for a fast end-to-end check.
+
+**Conda environments fail to build**
+If conda environments were built on a different OS (e.g. macOS) and transferred to Linux, they will fail with `Exec format error`. Delete the cached environments and let Nextflow rebuild them:
+```bash
+rm -rf work/conda/
+nextflow run main.nf -profile test
+```
 
 **Resuming a failed run**
 ```bash
