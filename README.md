@@ -14,7 +14,7 @@
 
 ---
 
-![FinPhaser Pipeline Overview](docs/figures/finphaser.png)
+![FinPhaser Pipeline Overview](docs/figures/finphaser.png | width=100)
 
 ---
 
