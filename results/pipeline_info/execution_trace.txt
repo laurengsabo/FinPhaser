@@ -1,0 +1,5 @@
+task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
+1	41/425030	80450	IBD_WORKFLOW:WRITE_SEX_TSV (WriteSexTSV)	COMPLETED	0	2026-05-05 22:19:51.862	819ms	0ms	-	-	-	-	-
+2	c2/f5cdf0	80460	ANCESTRY_WORKFLOW:PHASE_PARENTS (PhaseParents)	COMPLETED	0	2026-05-05 22:19:51.879	31s	30s	-	-	-	-	-
+3	24/4a34fc	80607	IBD_WORKFLOW:COMPRESS_VCF (CompressVCF)	ABORTED	-	2026-05-05 22:20:22.873	-	-	-	-	-	-	-
+4	ec/1cbd8f	80608	ANCESTRY_WORKFLOW:PREPARE_HMM_INPUT (PrepareHMMInput)	ABORTED	-	2026-05-05 22:20:22.877	-	-	-	-	-	-	-

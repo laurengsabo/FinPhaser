@@ -5,22 +5,17 @@ bin/yaml_to_sex_tsv.py
 Generates the Genomics_Sex.tsv file that SPORE needs from the sex
 fields embedded in samples.yml.
 
-This replaces the need to maintain a separate Genomics_Sex.tsv file.
-
-Output format (matches the original Genomics_Sex.tsv exactly) (example of example data output):
+Output format (matches original Genomics_Sex.tsv exactly):
     indv<TAB>GenomicsSex
-    YH011m<TAB>M
-    YH006f<TAB>F
-    YH016<TAB>F
+    YH_011_m<TAB>M
+    YH_006_f<TAB>F
+    YH_016<TAB>F
     ...
 
-Naming sanitisation applied here (using example data):
-  - VCF sample names use underscores: YH_006_f, YH_011_m, YH_016
-  - SPORE cannot handle underscores in sample IDs
-  - This script strips all underscores when writing the TSV:
-      YH_006_f  →  YH006f
-      YH_011_m  →  YH011m
-      YH_016    →  YH016
+IMPORTANT: Sample names are written exactly as they appear in samples.yml,
+with underscores preserved. SPORE matches these names against the VCF
+sample names, which also contain underscores — stripping them causes
+mismatches and breaks the sex-based analysis.
 
 Each unique sample is written ONCE (parents appear twice in the
 populations block for haplotype tracking, but only once in the TSV).
@@ -37,8 +32,6 @@ import argparse
 import sys
 from pathlib import Path
 
-
-# ── Reuse the same minimal parser as yaml_to_popinfo.py ──────────────────────
 
 def parse_populations(yml_path: Path) -> list:
     """
@@ -87,12 +80,12 @@ def parse_populations(yml_path: Path) -> list:
         # Block style — continuation
         if populations and ":" in line and not line.startswith("-"):
             k, v = line.split(":", 1)
-            populations[-1][k.strip()] = v.strip().strip('"').strip("'")
+            # Strip inline comments
+            v_clean = v.split("#")[0].strip().strip('"').strip("'")
+            populations[-1][k.strip()] = v_clean
 
     return populations
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -133,23 +126,22 @@ def main():
                 continue
             seen[sample] = sex
         elif seen[sample] != sex:
-            # Sex disagrees between two entries for the same sample
             sys.exit(
                 f"ERROR: conflicting sex values for sample '{sample}': "
                 f"'{seen[sample]}' vs '{sex}'. Check samples.yml."
             )
 
-    # Write TSV — strip underscores from names for SPORE compatibility
+    # Write TSV — preserve sample names exactly as in samples.yml
+    # (underscores kept — SPORE matches against VCF names which also have underscores)
     out_path = Path(args.out)
     with open(out_path, "w") as fh:
         fh.write("indv\tGenomicsSex\n")
         for sample, sex in seen.items():
-            spore_name = sample.replace("_", "")   # YH_006_f → YH006f
-            fh.write(f"{spore_name}\t{sex}\n")
+            fh.write(f"{sample}\t{sex}\n")
 
     print(
         f"[yaml_to_sex_tsv] Wrote {len(seen)} samples to {out_path} "
-        f"(underscores stripped for SPORE compatibility)"
+        f"(sample names preserved with underscores)"
     )
 
 

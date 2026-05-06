@@ -1,0 +1,7 @@
+[1] "SPORE 2.1.4"
+[1] "Web: https://github.com/jnrunge/SPORE"
+[1] "SPORE-Settings.R"
+Loading required package: this.path
+[1] "LowTrioMode = FALSE"
+Error in library(readr) : there is no package called ‘readr’
+Execution halted

@@ -39,7 +39,7 @@ workflow {
     // ── Startup log ──────────────────────────────────────────────────────────
     log.info """
     ┌─────────────────────────────────────────────────────────┐
-    │           F I N P H A S E R  v1.0.0                     │
+    │           F I N P H A S E R  v1.0.0                    │
     │  Local Ancestry Inference & IBD Detection Pipeline      │
     └─────────────────────────────────────────────────────────┘
     vcf          : ${vcf_path}  (from samples.yml)
@@ -80,14 +80,16 @@ workflow {
     )
 
     // ── Completion handler ────────────────────────────────────────────────────
-    // Moved inside workflow {} block — required by Nextflow 26+
+    // Null-safe checks required for Nextflow 26+ when workflow aborts
     workflow.onComplete {
-        def status = workflow.success ? "SUCCESS ✔" : "FAILED ✘"
+        def success  = workflow.success  ?: false
+        def duration = workflow.duration ?: "unknown"
+        def status   = success ? "SUCCESS ✔" : "FAILED ✘"
         log.info """
         ──────────────────────────────────────────────────────────
         Pipeline complete!
         Status   : ${status}
-        Duration : ${workflow.duration}
+        Duration : ${duration}
         Outputs  : ${params.outdir}/
         Report   : ${params.tracedir}/execution_report.html
         ──────────────────────────────────────────────────────────
@@ -95,6 +97,7 @@ workflow {
     }
 
     workflow.onError {
-        log.error "Pipeline failed: ${workflow.errorReport}"
+        def report = workflow.errorReport ?: "see .nextflow.log for details"
+        log.error "Pipeline failed: ${report}"
     }
 }

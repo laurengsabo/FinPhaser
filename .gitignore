@@ -1,0 +1,6 @@
+
+# Nextflow runtime artifacts
+.nextflow/
+.nextflow.log
+.nextflow.log.*
+work/
