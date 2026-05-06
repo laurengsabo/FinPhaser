@@ -14,7 +14,9 @@
 
 ---
 
-![FinPhaser Pipeline Overview](docs/figures/finphaser.png | width=100)
+<p align="center">
+  <img src="docs/figures/finphaser.png" width="600" alt="FinPhaser Pipeline Overview"/>
+</p>
 
 ---
 
