@@ -1,1 +1,7 @@
 data/raw/YHPedigree1_FilteredSNVs.recode.vcf filter=lfs diff=lfs merge=lfs -text
+*.vcf filter=lfs diff=lfs merge=lfs -text
+*.vcf.gz filter=lfs diff=lfs merge=lfs -text
+*.vcf.gz.csi filter=lfs diff=lfs merge=lfs -text
+*.posterior filter=lfs diff=lfs merge=lfs -text
+*.ibd filter=lfs diff=lfs merge=lfs -text
+*.ibd.gz filter=lfs diff=lfs merge=lfs -text
