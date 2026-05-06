@@ -15,7 +15,7 @@
 # ============================================================
 
 # ── Input VCF ────────────────────────────────────────────────
-vcf: "data/test/test_FilteredSNVs.recode.vcf.gz"
+vcf: "data/test/test_FilteredSNVs.recode.vcf"
 
 # ── Chromosome → linkage group mapping ───────────────────────
 linkage_groups:
